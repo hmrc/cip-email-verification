@@ -11,6 +11,9 @@ lazy val microservice = Project("cip-email-verification", file("."))
     // suppress warnings in generated routes files
     scalacOptions += "-Wconf:src=routes/.*:s",
   )
+  .settings(
+    PlayKeys.playDefaultPort := 6183
+  )
   .settings(publishingSettings: _*)
   .configs(IntegrationTest)
   .settings(integrationTestSettings(): _*)
