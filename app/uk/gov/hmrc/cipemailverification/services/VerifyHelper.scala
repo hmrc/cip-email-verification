@@ -20,18 +20,23 @@ import play.api.Logging
 import play.api.http.HttpEntity
 import play.api.http.Status.{BAD_REQUEST, FORBIDDEN, INTERNAL_SERVER_ERROR, TOO_MANY_REQUESTS}
 import play.api.libs.json.Json
-import play.api.mvc.Results.{Accepted, BadGateway, BadRequest, InternalServerError, ServiceUnavailable, TooManyRequests}
+import play.api.mvc.Results.{Accepted, BadGateway, BadRequest, InternalServerError, Ok, ServiceUnavailable, TooManyRequests}
 import play.api.mvc.{ResponseHeader, Result}
+import uk.gov.hmrc.cipemailverification.config.AppConfig
 import uk.gov.hmrc.cipemailverification.connectors.GovUkConnector
 import uk.gov.hmrc.cipemailverification.models.EmailPasscodeData
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Message._
-import uk.gov.hmrc.cipemailverification.models.api.{Email, ErrorResponse}
+import uk.gov.hmrc.cipemailverification.models.api.StatusMessage.{NOT_VERIFIED, VERIFIED}
+import uk.gov.hmrc.cipemailverification.models.api.{Email, ErrorResponse, VerificationStatus}
+import uk.gov.hmrc.cipemailverification.models.domain.data.EmailAndPasscode
 import uk.gov.hmrc.cipemailverification.models.http.govnotify.GovUkNotificationId
+import uk.gov.hmrc.cipemailverification.models.http.validation.ValidatedEmail
 import uk.gov.hmrc.cipemailverification.utils.DateTimeUtils
 import uk.gov.hmrc.http.HttpReads.{is2xx, is4xx, is5xx}
 import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse}
 
+import java.time.Duration
 import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
@@ -39,11 +44,14 @@ import scala.util.{Failure, Success}
 abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
                                       passcodeService: PasscodeService,
                                       govUkConnector: GovUkConnector,
-                                      dateTimeUtils: DateTimeUtils)
+                                      dateTimeUtils: DateTimeUtils,
+                                      config: AppConfig)
                                      (implicit ec: ExecutionContext) extends Logging {
 
-  protected def processResponse(res: HttpResponse)(implicit hc: HeaderCarrier): Future[Result] = res match {
-    case _ if is2xx(res.status) => processValidEmailAddress(res.json.as[Email])
+  private val passcodeExpiry = config.passcodeExpiry
+
+  protected def processResponse(res: HttpResponse, email: Email)(implicit hc: HeaderCarrier): Future[Result] = res match {
+    case _ if is2xx(res.status) => processValidEmailAddress(email)
     case _ if is4xx(res.status) => Future(BadRequest(res.json))
     case _ if is5xx(res.status) => Future(BadGateway(
       Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_ERROR.id, EXTERNAL_SERVER_EXPERIENCED_AN_ISSUE))
@@ -60,6 +68,65 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
         logger.error(s"Database operation failed, ${err.getMessage}")
         Future.successful(InternalServerError(Json.toJson(ErrorResponse(Codes.PASSCODE_PERSISTING_FAIL.id, SERVER_EXPERIENCED_AN_ISSUE))))
     }
+  }
+
+  protected def processResponseForPasscode(res: HttpResponse, emailAndPasscode: EmailAndPasscode)
+                                          (implicit hc: HeaderCarrier): Future[Result] = res match {
+    case _ if is2xx(res.status) => processValidPasscode(res.json.as[ValidatedEmail], emailAndPasscode.passcode)
+    case _ if is4xx(res.status) => Future(BadRequest(res.json))
+    case _ if is5xx(res.status) => Future(BadGateway(
+      Json.toJson(ErrorResponse(Codes.SERVER_CURRENTLY_UNAVAILABLE.id, SERVER_CURRENTLY_UNAVAILABLE)) //TODO
+    ))
+  }
+
+  private def processValidPasscode(validatedEmail: ValidatedEmail, passcode: String)
+                                  (implicit hc: HeaderCarrier) = {
+    (for {
+      maybeEmailAndPasscodeData <- passcodeService.retrievePasscode(validatedEmail.email)
+      result <- processPasscode(EmailAndPasscode(validatedEmail.email, passcode), maybeEmailAndPasscodeData)
+    } yield result).recover {
+      case err =>
+        logger.error(s"Database operation failed - ${err.getMessage}")
+        InternalServerError(Json.toJson(ErrorResponse(Codes.PASSCODE_CHECK_FAIL.id, SERVER_EXPERIENCED_AN_ISSUE))) //Done
+    }
+  }
+
+  private def processPasscode(enteredEmailAndPasscode: EmailAndPasscode,
+                              maybeEmailAndPasscode: Option[EmailPasscodeData])(implicit hc: HeaderCarrier): Future[Result] =
+    maybeEmailAndPasscode match {
+      case Some(storedEmailAndpasscode) => checkIfPasscodeIsStillAllowedToBeUsed(enteredEmailAndPasscode, storedEmailAndpasscode, System.currentTimeMillis())
+      case _ =>
+        Future.successful(Ok(Json.toJson(ErrorResponse(Codes.PASSCODE_ENTERED_EXPIRED_CACHE.id, PASSCODE_STORED_TIME_ELAPSED)))) //Done
+    }
+
+  private def checkIfPasscodeIsStillAllowedToBeUsed(enteredEmailAndPasscode: EmailAndPasscode, foundEmailPasscodeData: EmailPasscodeData, now: Long)(implicit hc: HeaderCarrier): Future[Result] = {
+    hasPasscodeExpired(foundEmailPasscodeData: EmailPasscodeData, now) match {
+      case true =>
+        Future.successful(Ok(Json.toJson(ErrorResponse(Codes.PASSCODE_ENTERED_EXPIRED.id, PASSCODE_ALLOWED_TIME_ELAPSED)))) //Done
+      case false => checkIfPasscodeMatches(enteredEmailAndPasscode, foundEmailPasscodeData)
+    }
+  }
+
+  private def hasPasscodeExpired(foundPhoneNumberPasscodeData: EmailPasscodeData, currentTime: Long): Boolean = {
+    val elapsedTimeInMilliseconds: Long = calculateElapsedTime(foundPhoneNumberPasscodeData.createdAt, currentTime)
+    val allowedTimeGapForPasscodeUsageInMilliseconds: Long = Duration.ofMinutes(passcodeExpiry).toMillis
+    elapsedTimeInMilliseconds > allowedTimeGapForPasscodeUsageInMilliseconds
+  }
+
+  private def checkIfPasscodeMatches(enteredEmailAndPasscode: EmailAndPasscode,
+                                     maybeEmailAndPasscodeData: EmailPasscodeData)(implicit hc: HeaderCarrier): Future[Result] = {
+    passcodeMatches(enteredEmailAndPasscode.passcode, maybeEmailAndPasscodeData.passcode) match {
+      case true => Future.successful(Ok(Json.toJson(VerificationStatus(VERIFIED))))
+      case false => Future.successful(Ok(Json.toJson(VerificationStatus(NOT_VERIFIED))))
+    }
+  }
+
+  private def passcodeMatches(enteredPasscode: String, storedPasscode: String): Boolean = {
+    enteredPasscode.equals(storedPasscode)
+  }
+
+  def calculateElapsedTime(timeA: Long, timeB: Long): Long = {
+    timeB - timeA
   }
 
     private def sendPasscode(data: EmailPasscodeData)

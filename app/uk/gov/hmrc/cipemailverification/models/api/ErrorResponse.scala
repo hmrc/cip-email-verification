@@ -29,12 +29,15 @@ object ErrorResponse {
 
     val VALIDATION_ERROR                        = Value(1002)
     val EXTERNAL_SERVER_FAIL_VALIDATION         = Value(1004)
-    val SERVER_CURRENTLY_UNAVAILABLE            = Value(1009)
-    val PASSCODE_PERSISTING_FAIL                = Value(1008)
+    val PASSCODE_CHECK_FAIL                     = Value(1005)
     val EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE   = Value(1006)
     val MESSAGE_THROTTLED_OUT                   = Value(1007)
+    val PASSCODE_PERSISTING_FAIL                = Value(1008)
+    val SERVER_CURRENTLY_UNAVAILABLE            = Value(1009)
     val EXTERNAL_SERVER_FAIL_FORBIDDEN          = Value(1010)
     val EXTERNAL_SERVER_ERROR                   = Value(1012)
+    val PASSCODE_ENTERED_EXPIRED                = Value(1013)
+    val PASSCODE_ENTERED_EXPIRED_CACHE          = Value(1014)
 
   }
 

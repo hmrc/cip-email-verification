@@ -3,7 +3,7 @@ POST http://localhost:6183/customer-insight-platform/email/verify
 content-type: application/json
 
 {
-  "email" : "test@test.com"
+  "email" : "test1test.com"
 }
 
 ### Badrequest
@@ -45,4 +45,13 @@ content-type: application/json
 
 {
   "email" : "trialmode@something.com"
+}
+
+###
+POST http://localhost:6183/customer-insight-platform/email/verify/passcode
+content-type: application/json
+
+{
+  "email" : "test1@test.com",
+  "passcode":"CWQUGB"
 }
