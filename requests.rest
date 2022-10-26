@@ -1,0 +1,48 @@
+### Correct-email
+POST http://localhost:6183/customer-insight-platform/email/verify
+content-type: application/json
+
+{
+  "email" : "test@test.com"
+}
+
+### Badrequest
+POST http://localhost:6183/customer-insight-platform/email/verify
+content-type: application/json
+
+{
+  "email" : "teamonly@something.com"
+}
+
+### Forbidden
+POST http://localhost:6183/customer-insight-platform/email/verify
+content-type: application/json
+
+{
+  "email" : "systemclock@something.com"
+}
+
+### Too many request
+POST http://localhost:6183/customer-insight-platform/email/verify
+content-type: application/json
+
+{
+  "email" : "ratelimit@something.com"
+}
+
+### InternalServerError
+POST http://localhost:6183/customer-insight-platform/email/verify
+content-type: application/json
+
+{
+  "email" : "exception@something.com"
+}
+
+
+### Trial Mode - expecting `"code": 1004`
+POST http://localhost:6183/customer-insight-platform/email/verify
+content-type: application/json
+
+{
+  "email" : "trialmode@something.com"
+}
