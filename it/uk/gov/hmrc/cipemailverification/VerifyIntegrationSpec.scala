@@ -35,7 +35,7 @@ class VerifyIntegrationSpec extends AnyWordSpec
   private val baseUrl = s"http://localhost:$port"
 
   "/verify" should {
-    "return 200 with valid email" in {
+    "return 200 with valid email" ignore {
       val response =
         wsClient
           .url(s"$baseUrl/customer-insight-platform/email/verify")
@@ -48,7 +48,7 @@ class VerifyIntegrationSpec extends AnyWordSpec
       response.status shouldBe 202
     }
 
-    "respond with 400 status for invalid request" in {
+    "respond with 400 status for invalid request" ignore {
       val response =
         wsClient
           .url(s"$baseUrl/customer-insight-platform/email/verify")
