@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.cipemailverification.models
 
-import play.api.libs.json.{Json, Reads, Writes}
+import play.api.libs.json.Json
 
 case class EmailPasscodeData(email: String, passcode: String, createdAt: Long)
 
