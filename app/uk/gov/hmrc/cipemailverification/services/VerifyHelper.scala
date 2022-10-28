@@ -99,7 +99,8 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
         Future.successful(Ok(Json.toJson(ErrorResponse(Codes.PASSCODE_ENTERED_EXPIRED_CACHE.id, PASSCODE_STORED_TIME_ELAPSED)))) //Done
     }
 
-  private def checkIfPasscodeIsStillAllowedToBeUsed(enteredEmailAndPasscode: EmailAndPasscode, foundEmailPasscodeData: EmailPasscodeData, now: Long)(implicit hc: HeaderCarrier): Future[Result] = {
+  private def checkIfPasscodeIsStillAllowedToBeUsed(enteredEmailAndPasscode: EmailAndPasscode, foundEmailPasscodeData: EmailPasscodeData, now: Long)
+                                                   (implicit hc: HeaderCarrier): Future[Result] = {
     hasPasscodeExpired(foundEmailPasscodeData: EmailPasscodeData, now) match {
       case true =>
         Future.successful(Ok(Json.toJson(ErrorResponse(Codes.PASSCODE_ENTERED_EXPIRED.id, PASSCODE_ALLOWED_TIME_ELAPSED)))) //Done
@@ -125,34 +126,34 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
     enteredPasscode.equals(storedPasscode)
   }
 
-  def calculateElapsedTime(timeA: Long, timeB: Long): Long = {
+  private def calculateElapsedTime(timeA: Long, timeB: Long): Long = {
     timeB - timeA
   }
 
-    private def sendPasscode(data: EmailPasscodeData)
-                            (implicit hc: HeaderCarrier) = govUkConnector.sendPasscode(data) map {
-      case Left(error) => error.statusCode match {
-        case INTERNAL_SERVER_ERROR =>
-          logger.error(error.getMessage)
-          BadGateway(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_ERROR.id, EXTERNAL_SERVER_EXPERIENCED_AN_ISSUE)))
-        case BAD_REQUEST =>
-          logger.error(error.getMessage)
-          ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_FAIL_VALIDATION.id, SERVER_EXPERIENCED_AN_ISSUE)))
-        case FORBIDDEN =>
-          logger.error(error.getMessage)
-          ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_FAIL_FORBIDDEN.id, SERVER_EXPERIENCED_AN_ISSUE)))
-        case TOO_MANY_REQUESTS =>
-          logger.error(error.getMessage)
-          TooManyRequests(Json.toJson(ErrorResponse(Codes.MESSAGE_THROTTLED_OUT.id, THROTTLED_TOO_MANY_REQUESTS)))
-        case _ =>
-          logger.error(error.getMessage)
-          Result.apply(ResponseHeader(error.statusCode), HttpEntity.NoEntity)
-      }
-      case Right(response) if response.status == 201 =>
-        Accepted.withHeaders(("Location", s"/notifications/${response.json.as[GovUkNotificationId].id}"))
-    } recover {
-      case err =>
-        logger.error(err.getMessage)
-        ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE.id, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
+  private def sendPasscode(data: EmailPasscodeData)
+                          (implicit hc: HeaderCarrier) = govUkConnector.sendPasscode(data) map {
+    case Left(error) => error.statusCode match {
+      case INTERNAL_SERVER_ERROR =>
+        logger.error(error.getMessage)
+        BadGateway(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_ERROR.id, EXTERNAL_SERVER_EXPERIENCED_AN_ISSUE)))
+      case BAD_REQUEST =>
+        logger.error(error.getMessage)
+        ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_FAIL_VALIDATION.id, SERVER_EXPERIENCED_AN_ISSUE)))
+      case FORBIDDEN =>
+        logger.error(error.getMessage)
+        ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_FAIL_FORBIDDEN.id, SERVER_EXPERIENCED_AN_ISSUE)))
+      case TOO_MANY_REQUESTS =>
+        logger.error(error.getMessage)
+        TooManyRequests(Json.toJson(ErrorResponse(Codes.MESSAGE_THROTTLED_OUT.id, THROTTLED_TOO_MANY_REQUESTS)))
+      case _ =>
+        logger.error(error.getMessage)
+        Result.apply(ResponseHeader(error.statusCode), HttpEntity.NoEntity)
     }
+    case Right(response) if response.status == 201 =>
+      Accepted.withHeaders(("Location", s"/notifications/${response.json.as[GovUkNotificationId].id}"))
+  } recover {
+    case err =>
+      logger.error(err.getMessage)
+      ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE.id, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
+  }
 }

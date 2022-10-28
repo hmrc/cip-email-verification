@@ -25,4 +25,3 @@ class Module extends AbstractModule {
     bind(classOf[AppConfig]).asEagerSingleton()
   }
 }
-

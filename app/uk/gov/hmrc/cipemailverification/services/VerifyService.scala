@@ -32,12 +32,12 @@ import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-class VerifyService @Inject() (passcodeGenerator: PasscodeGenerator,
-                               passcodeService: PasscodeService,
-                               dateTimeUtils: DateTimeUtils,
-                               govUkConnector: GovUkConnector,
-                               validateConnector: ValidateConnector,
-                               config: AppConfig)(implicit val executionContext: ExecutionContext) extends
+class VerifyService @Inject()(passcodeGenerator: PasscodeGenerator,
+                              passcodeService: PasscodeService,
+                              dateTimeUtils: DateTimeUtils,
+                              govUkConnector: GovUkConnector,
+                              validateConnector: ValidateConnector,
+                              config: AppConfig)(implicit val executionContext: ExecutionContext) extends
   VerifyHelper(passcodeGenerator, passcodeService, govUkConnector, dateTimeUtils, config) {
 
   def verifyEmail(email: Email)(implicit hc: HeaderCarrier): Future[Result] =
@@ -57,4 +57,3 @@ class VerifyService @Inject() (passcodeGenerator: PasscodeGenerator,
     }
   }
 }
-
