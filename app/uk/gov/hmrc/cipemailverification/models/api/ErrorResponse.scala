@@ -35,6 +35,7 @@ object ErrorResponse {
     val MESSAGE_THROTTLED_OUT                   = Value(1007)
     val EXTERNAL_SERVER_FAIL_FORBIDDEN          = Value(1010)
     val EXTERNAL_SERVER_ERROR                   = Value(1012)
+
   }
 
   object Message extends Enumeration {
@@ -50,3 +51,4 @@ object ErrorResponse {
     val THROTTLED_TOO_MANY_REQUESTS = "The request for the API is throttled as you have exceeded your quota"
   }
 }
+

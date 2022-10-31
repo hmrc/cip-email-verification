@@ -20,17 +20,16 @@ import akka.stream.Materializer
 import play.api.Logging
 import play.api.libs.json.Json
 import uk.gov.hmrc.cipemailverification.config.{AppConfig, CircuitBreakerConfig}
-import uk.gov.hmrc.http.HttpReads.Implicits._
-import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse, StringContextOps}
+import uk.gov.hmrc.http.client.HttpClientV2
+import uk.gov.hmrc.http.HttpReads.Implicits._
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 @Singleton
-class ValidateConnector @Inject()(httpClientV2: HttpClientV2, config: AppConfig)
-                                 (implicit ec: ExecutionContext, val materializer: Materializer)
+class ValidateConnector @Inject()(httpClientV2: HttpClientV2, config: AppConfig)(implicit ec: ExecutionContext, val materializer: Materializer)
   extends Logging with CircuitBreakerWrapper {
 
   implicit val connectionFailure: Try[HttpResponse] => Boolean = {
@@ -43,10 +42,10 @@ class ValidateConnector @Inject()(httpClientV2: HttpClientV2, config: AppConfig)
       httpClientV2
         .post(url"${config.validationConfig.url}/customer-insight-platform/email/validate")
         .withBody(Json.obj("email" -> s"$email"))
-        .setHeader(("Authorization", config.validationConfig.authToken))
         .execute[HttpResponse]
     )
   }
 
   override def configCB: CircuitBreakerConfig = config.validationConfig.cbConfig
 }
+

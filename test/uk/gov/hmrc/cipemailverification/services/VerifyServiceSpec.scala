@@ -42,6 +42,7 @@ class VerifyServiceSpec extends AnyWordSpec
       val email = Email("test@test.com")
       val emailPasscodeDataFromDb = EmailPasscodeData(email.email, passcode, now)
 
+
       // return Ok from email validation
       validateConnectorMock.callService(email.email)
         .returns(Future.successful(HttpResponse(OK, """{"email": "test@test.com"}""")))
@@ -100,5 +101,8 @@ class VerifyServiceSpec extends AnyWordSpec
       dateTimeUtilsMock,
       govUkConnectorMock,
       validateConnectorMock)
+
   }
 }
+
+

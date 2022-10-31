@@ -16,15 +16,16 @@
 
 package uk.gov.hmrc.cipemailverification.config
 
-import play.api.Configuration
-
 import javax.inject.{Inject, Singleton}
+import play.api.Configuration
 
 @Singleton
 class AppConfig @Inject()(config: Configuration) {
 
+  val appName: String = config.get[String]("appName")
   lazy val cacheExpiry: Long = config.get[Long]("cache.expiry")
   lazy val validationConfig: CipValidationConfig = config.get[CipValidationConfig]("microservice.services.cipemail.validation")
   lazy val govNotifyConfig: GovNotifyConfig = config.get[GovNotifyConfig]("microservice.services.govuk-notify")
   lazy val passcodeExpiry: Long = config.get[Long]("passcode.expiry")
 }
+

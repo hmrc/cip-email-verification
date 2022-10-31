@@ -27,7 +27,6 @@ import scala.util.Try
 
 trait CircuitBreakerWrapper extends Logging {
   protected def materializer: Materializer
-
   def configCB: CircuitBreakerConfig
 
   def withCircuitBreaker[T](block: => Future[T])(implicit connectionFailure: Try[T] => Boolean): Future[T] =
@@ -53,3 +52,4 @@ trait CircuitBreakerWrapper extends Logging {
         logger.warn(s"Circuit breaker for ${configCB.serviceName} recorded failed call due to timeout after ${duration.toMillis}ms")
     }
 }
+

@@ -16,8 +16,9 @@
 
 package uk.gov.hmrc.cipemailverification.connectors
 
-import com.github.tomakehurst.wiremock.client.WireMock._
-import org.mockito.IdiomaticMockito
+import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, equalToJson, post, postRequestedFor, stubFor, urlEqualTo, verify}
+import org.mockito.Mockito.when
+import org.mockito.MockitoSugar.mock
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -30,15 +31,14 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.Duration
 
 class ValidateConnectorSpec extends AnyWordSpec
   with Matchers
   with WireMockSupport
   with ScalaFutures
   with HttpClientV2Support
-  with TestActorSystem
-  with IdiomaticMockito {
+  with TestActorSystem {
 
   val url: String = "/customer-insight-platform/email/validate"
 
@@ -48,6 +48,9 @@ class ValidateConnectorSpec extends AnyWordSpec
       val email = Email("test@test.test")
 
       stubFor(post(urlEqualTo(url)).willReturn(aResponse()))
+      when(appConfigMock.validationConfig).thenReturn(CipValidationConfig(
+        "http", wireMockHost, wireMockPort, cbConfigData))
+      when(appConfigMock.cacheExpiry).thenReturn(1)
 
       val result = validateConnector.callService(email.email)
 
@@ -65,14 +68,10 @@ class ValidateConnectorSpec extends AnyWordSpec
     protected implicit val hc: HeaderCarrier = HeaderCarrier()
 
     protected val appConfigMock = mock[AppConfig]
-    protected val cipValidationConfigMock = mock[CipValidationConfig]
-
-    val cbConfigData = CircuitBreakerConfig("", 5, 5.minutes, 30.seconds, 5.minutes, 1, 0)
-
-    appConfigMock.validationConfig returns cipValidationConfigMock
-    cipValidationConfigMock.cbConfig returns cbConfigData
-    cipValidationConfigMock.url returns wireMockUrl
-    cipValidationConfigMock.authToken returns "fake-token"
+    val cbConfigData = CircuitBreakerConfig("", 5, 5.toDuration, 30.toDuration, 5.toDuration, 1, 0)
+    implicit class IntToDuration(timeout: Int) {
+      def toDuration = Duration(timeout, java.util.concurrent.TimeUnit.SECONDS)
+    }
 
     val validateConnector = new ValidateConnector(
       httpClientV2,
