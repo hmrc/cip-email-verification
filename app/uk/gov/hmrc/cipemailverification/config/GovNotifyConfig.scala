@@ -29,15 +29,16 @@ case class GovNotifyConfig(
 object GovNotifyConfig {
   implicit lazy val configLoader: ConfigLoader[GovNotifyConfig] =
     ConfigLoader {
-      rootConfig =>
-        path =>
-          val config = Configuration(rootConfig.getConfig(path))
-          GovNotifyConfig(
-            config.get[String]("host"),
-            config.get[String]("template_id"),
-            config.get[String]("api-key.iss-uuid"),
-            config.get[String]("api-key.secret-key-uuid"),
-            config.get[CircuitBreakerConfig]("circuit-breaker")
-          )
+      rootConfig => path =>
+        val config = Configuration(rootConfig.getConfig(path))
+        GovNotifyConfig(
+          config.get[String]("host"),
+          config.get[String]("template_id"),
+          config.get[String]("api-key.iss-uuid"),
+          config.get[String]("api-key.secret-key-uuid"),
+          config.get[CircuitBreakerConfig]("circuit-breaker")
+        )
     }
 }
+
+

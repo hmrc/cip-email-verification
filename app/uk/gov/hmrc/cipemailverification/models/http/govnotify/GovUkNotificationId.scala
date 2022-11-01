@@ -23,3 +23,4 @@ case class GovUkNotificationId(id: String)
 object GovUkNotificationId {
   implicit val reads: Reads[GovUkNotificationId] = Json.reads[GovUkNotificationId]
 }
+

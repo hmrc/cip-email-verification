@@ -20,7 +20,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 class PasscodeGeneratorSpec extends AnyWordSpec
-  with Matchers {
+  with Matchers{
 
   private val passcodeGenerator = new PasscodeGenerator()
 

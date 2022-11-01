@@ -23,13 +23,14 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import play.api.http.Status.OK
 import play.api.libs.json.Json
-import play.api.test.Helpers.{await, defaultAwaitTimeout}
+import play.api.test.Helpers.await
 import uk.gov.hmrc.cipemailverification.TestActorSystem
 import uk.gov.hmrc.cipemailverification.config.CircuitBreakerConfig
-import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
 import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse, StringContextOps}
-
+import play.api.test.Helpers.{await, defaultAwaitTimeout}
 import scala.concurrent.ExecutionContext.Implicits.global
+import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
+
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
 

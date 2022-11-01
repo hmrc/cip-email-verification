@@ -33,3 +33,4 @@ class PasscodeGenerator {
     sb.mkString
   }
 }
+
