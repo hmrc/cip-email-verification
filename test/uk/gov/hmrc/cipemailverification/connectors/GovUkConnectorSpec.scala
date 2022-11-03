@@ -41,7 +41,30 @@ class GovUkConnectorSpec extends AnyWordSpec
   with HttpClientV2Support
   with TestActorSystem {
 
+  val notificationId = "test-notification-id"
   val emailUrl: String = "/v2/notifications/email"
+  val notificationsUrl: String = s"/v2/notifications/$notificationId"
+
+  "notificationStatus" should {
+    "delegate to http client" in new SetUp {
+      stubFor(
+        get(urlEqualTo(notificationsUrl))
+          .willReturn(aResponse())
+      )
+
+      when(appConfigMock.govNotifyConfig).thenReturn(GovNotifyConfig(
+        wireMockUrl, "template-id-fake", "", UUID.randomUUID().toString, cbConfigData))
+
+      when(appConfigMock.cacheExpiry).thenReturn(1)
+
+      val result = govUkConnector.notificationStatus(notificationId)
+      await(result).right.get.status shouldBe OK
+
+      verify(
+        getRequestedFor(urlEqualTo(notificationsUrl))
+      )
+    }
+  }
 
   "sendPasscode" should {
     "delegate to http client" in new SetUp {

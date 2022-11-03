@@ -38,6 +38,8 @@ object ErrorResponse {
     val EXTERNAL_SERVER_ERROR                   = Value(1012)
     val PASSCODE_ENTERED_EXPIRED                = Value(1013)
     val PASSCODE_ENTERED_EXPIRED_CACHE          = Value(1014)
+    val NOTIFICATION_NOT_FOUND                  = Value(1015)
+    val EXTERNAL_SERVICE_TIMEOUT                = Value(1016)
   }
 
   object Message extends Enumeration {
@@ -50,6 +52,9 @@ object ErrorResponse {
     val PASSCODE_ALLOWED_TIME_ELAPSED = "The passcode has expired. Request a new passcode"
     val PASSCODE_STORED_TIME_ELAPSED = "Enter a correct passcode"
     val EMAIL_VALIDATION = "Enter a valid email"
+    val NOTIFICATION_ID_VALIDATION = "Enter a valid notification Id"
+    val NOTIFICATION_ID_NOT_FOUND = "Notification Id not found"
     val THROTTLED_TOO_MANY_REQUESTS = "The request for the API is throttled as you have exceeded your quota"
+    val EXTERNAL_SERVER_TIMEOUT = "External Service has experienced a timeout"
   }
 }
