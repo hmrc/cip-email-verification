@@ -14,17 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.cipemailverification.config
+package uk.gov.hmrc.cipemailverification.models.http.validation
 
-import javax.inject.{Inject, Singleton}
-import play.api.Configuration
+import play.api.libs.json._
 
-@Singleton
-class AppConfig @Inject()(config: Configuration) {
+case class ValidatedEmail(email: String)
 
-  lazy val cacheExpiry: Long = config.get[Long]("cache.expiry")
-  lazy val validationConfig: CipValidationConfig = config.get[CipValidationConfig]("microservice.services.cipemail.validation")
-  lazy val govNotifyConfig: GovNotifyConfig = config.get[GovNotifyConfig]("microservice.services.govuk-notify")
-  lazy val passcodeExpiry: Long = config.get[Long]("passcode.expiry")
+object ValidatedEmail {
+  implicit val format: Format[ValidatedEmail] = Json.format[ValidatedEmail]
 }
-

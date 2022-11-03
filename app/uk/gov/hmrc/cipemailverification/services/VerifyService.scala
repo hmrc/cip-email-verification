@@ -19,10 +19,12 @@ package uk.gov.hmrc.cipemailverification.services
 import play.api.libs.json.Json
 import play.api.mvc.Result
 import play.api.mvc.Results._
+import uk.gov.hmrc.cipemailverification.config.AppConfig
 import uk.gov.hmrc.cipemailverification.connectors.{GovUkConnector, ValidateConnector}
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Message._
 import uk.gov.hmrc.cipemailverification.models.api.{Email, ErrorResponse}
+import uk.gov.hmrc.cipemailverification.models.domain.data.EmailAndPasscode
 import uk.gov.hmrc.cipemailverification.utils.DateTimeUtils
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -34,15 +36,25 @@ class VerifyService @Inject() (passcodeGenerator: PasscodeGenerator,
                                passcodeService: PasscodeService,
                                dateTimeUtils: DateTimeUtils,
                                govUkConnector: GovUkConnector,
-                               validateConnector: ValidateConnector)(implicit val executionContext: ExecutionContext) extends
-  VerifyHelper(passcodeGenerator, passcodeService, govUkConnector, dateTimeUtils) {
+                               validateConnector: ValidateConnector,
+                               config: AppConfig)(implicit val executionContext: ExecutionContext) extends
+  VerifyHelper(passcodeGenerator, passcodeService, govUkConnector, dateTimeUtils, config) {
 
   def verifyEmail(email: Email)(implicit hc: HeaderCarrier): Future[Result] =
     validateConnector.callService(email.email) transformWith {
-      case Success(httpResponse) => processResponse(httpResponse)
+      case Success(httpResponse) => processResponse(httpResponse, email)
       case Failure(error) =>
         logger.error(error.getMessage)
         Future.successful(ServiceUnavailable(Json.toJson(ErrorResponse(Codes.SERVER_CURRENTLY_UNAVAILABLE.id, SERVER_CURRENTLY_UNAVAILABLE))))
     }
+
+  def verifyPasscode(emailAndPasscode: EmailAndPasscode)(implicit hc: HeaderCarrier): Future[Result] = {
+    validateConnector.callService(emailAndPasscode.email).transformWith {
+      case Success(httpResponse) => processResponseForPasscode(httpResponse, emailAndPasscode)
+      case Failure(error) =>
+        logger.error(error.getMessage)
+        Future.successful(ServiceUnavailable(Json.toJson(ErrorResponse(Codes.SERVER_CURRENTLY_UNAVAILABLE.id, SERVER_CURRENTLY_UNAVAILABLE))))
+    }
+  }
 }
 
