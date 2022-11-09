@@ -17,7 +17,7 @@
 package uk.gov.hmrc.cipemailverification.services
 
 import play.api.Logging
-import uk.gov.hmrc.cipemailverification.models.EmailPasscodeData
+import uk.gov.hmrc.cipemailverification.models.domain.data.EmailAndPasscodeData
 import uk.gov.hmrc.cipemailverification.repositories.PasscodeCacheRepository
 import uk.gov.hmrc.mongo.cache.DataKey
 
@@ -26,14 +26,14 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class PasscodeService @Inject()(passcodeCacheRepository: PasscodeCacheRepository)
                                (implicit ec: ExecutionContext) extends Logging {
-  def persistPasscode(emailPasscodeData: EmailPasscodeData): Future[EmailPasscodeData] = {
+  def persistPasscode(emailPasscodeData: EmailAndPasscodeData): Future[EmailAndPasscodeData] = {
     logger.debug(s"Storing emailPasscodeData in database")
     passcodeCacheRepository.put(emailPasscodeData.email)(DataKey("cip-email-verification"), emailPasscodeData)
       .map(_ => emailPasscodeData)
   }
 
-  def retrievePasscode(email: String): Future[Option[EmailPasscodeData]] = {
+  def retrievePasscode(email: String): Future[Option[EmailAndPasscodeData]] = {
     logger.debug(s"Retrieving emailPasscodeData from database")
-    passcodeCacheRepository.get[EmailPasscodeData](email)(DataKey("cip-email-verification"))
+    passcodeCacheRepository.get[EmailAndPasscodeData](email)(DataKey("cip-email-verification"))
   }
 }

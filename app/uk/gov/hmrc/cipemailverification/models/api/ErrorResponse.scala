@@ -17,7 +17,7 @@
 package uk.gov.hmrc.cipemailverification.models.api
 
 import play.api.libs.json.{Json, OWrites}
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Message.Message
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.Message
 
 case class ErrorResponse(code: Int, message: Message)
 
@@ -42,7 +42,7 @@ object ErrorResponse {
     val EXTERNAL_SERVICE_TIMEOUT                = Value(1016)
   }
 
-  object Message extends Enumeration {
+  object Messages extends Enumeration {
     type Message = String
 
     val SERVER_CURRENTLY_UNAVAILABLE = "Server currently unavailable"

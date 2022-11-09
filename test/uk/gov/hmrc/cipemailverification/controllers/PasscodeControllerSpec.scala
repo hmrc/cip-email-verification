@@ -26,8 +26,7 @@ import play.api.mvc.Results.Ok
 import play.api.test.Helpers.{contentAsJson, defaultAwaitTimeout, status}
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.VALIDATION_ERROR
-import uk.gov.hmrc.cipemailverification.models.api.VerificationStatus
-import uk.gov.hmrc.cipemailverification.models.domain.data.EmailAndPasscode
+import uk.gov.hmrc.cipemailverification.models.api.{EmailAndPasscode, VerificationStatus}
 import uk.gov.hmrc.cipemailverification.services.VerifyService
 import uk.gov.hmrc.http.HeaderCarrier
 

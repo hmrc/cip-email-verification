@@ -23,9 +23,9 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import play.api.http.Status.OK
 import play.api.test.Helpers.{await, defaultAwaitTimeout}
-import uk.gov.hmrc.cipemailverification.TestActorSystem
 import uk.gov.hmrc.cipemailverification.config.{AppConfig, CipValidationConfig, CircuitBreakerConfig}
 import uk.gov.hmrc.cipemailverification.models.api.Email
+import uk.gov.hmrc.cipemailverification.utils.TestActorSystem
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
 
@@ -43,13 +43,15 @@ class ValidateConnectorSpec extends AnyWordSpec
   val url: String = "/customer-insight-platform/email/validate"
 
   "callService" should {
-
     "delegate to http client" in new SetUp {
-      val email = Email("test@test.test")
+      private val email = Email("test@test.test")
 
       stubFor(post(urlEqualTo(url)).willReturn(aResponse()))
+      appConfigMock.validationConfig.returns(CipValidationConfig(
+        "http", wireMockHost, wireMockPort, "fake-token", cbConfigData))
+      appConfigMock.cacheExpiry.returns(1)
 
-      val result = validateConnector.callService(email.email)
+      private val result = validateConnector.callService(email.email)
 
       await(result).status shouldBe OK
 
@@ -61,13 +63,12 @@ class ValidateConnectorSpec extends AnyWordSpec
   }
 
   trait SetUp {
-
     protected implicit val hc: HeaderCarrier = HeaderCarrier()
 
-    protected val appConfigMock = mock[AppConfig]
-    protected val cipValidationConfigMock = mock[CipValidationConfig]
+    protected val appConfigMock: AppConfig = mock[AppConfig]
+    protected val cipValidationConfigMock: CipValidationConfig = mock[CipValidationConfig]
 
-    val cbConfigData = CircuitBreakerConfig("", 5, 5.minutes, 30.seconds, 5.minutes, 1, 0)
+    protected val cbConfigData: CircuitBreakerConfig = CircuitBreakerConfig("", 5, 5.minutes, 30.seconds, 5.minutes, 1, 0)
 
     appConfigMock.validationConfig returns cipValidationConfigMock
     cipValidationConfigMock.cbConfig returns cbConfigData

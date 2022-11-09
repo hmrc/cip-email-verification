@@ -14,19 +14,14 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.cipemailverification.utils
+package uk.gov.hmrc.cipemailverification.models.domain.audit
 
-import javax.inject.Singleton
+import play.api.libs.json.{Json, OWrites}
 
-@Singleton()
-class GovNotifyUtils {
+case class VerificationCheckAuditEvent(email: String, passcode: String, result: String, failureReason: Option[String] = None)
+  extends AuditEvent(email, passcode)
 
-  def extractPasscodeFromGovNotifyBody(body: String): String = {
-    val pattern = """verification code is (\w+)""".r.unanchored
+object VerificationCheckAuditEvent {
 
-    body match {
-      case pattern(passcode) =>
-        passcode
-    }
-  }
+  implicit val writes: OWrites[VerificationCheckAuditEvent] = Json.writes[VerificationCheckAuditEvent]
 }

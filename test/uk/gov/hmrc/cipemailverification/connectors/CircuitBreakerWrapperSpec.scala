@@ -24,13 +24,13 @@ import org.scalatest.wordspec.AnyWordSpec
 import play.api.http.Status.OK
 import play.api.libs.json.Json
 import play.api.test.Helpers.{await, defaultAwaitTimeout}
-import uk.gov.hmrc.cipemailverification.TestActorSystem
 import uk.gov.hmrc.cipemailverification.config.CircuitBreakerConfig
+import uk.gov.hmrc.cipemailverification.utils.TestActorSystem
 import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
 import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse, StringContextOps}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success, Try}
 
 class CircuitBreakerWrapperSpec extends AnyWordSpec
@@ -44,10 +44,9 @@ class CircuitBreakerWrapperSpec extends AnyWordSpec
 
   "Circuit Breakers" should {
     "not be triggered when call is successful" in new SetUp {
-
       stubFor(post(urlEqualTo(verificationUrl)).willReturn(aResponse()))
 
-      val result = circuitBreakers.withCircuitBreaker(
+      private val result = circuitBreakers.withCircuitBreaker(
         httpClientV2
           .post(url"http://$wireMockHost:$wireMockPort/customer-insight-platform/email-address/verify")
           .withBody(Json.obj("phoneNumber" -> "test"))
@@ -63,14 +62,10 @@ class CircuitBreakerWrapperSpec extends AnyWordSpec
 
   trait SetUp {
     protected implicit val hc: HeaderCarrier = HeaderCarrier()
-    val circuitBreakers = new CircuitBreakerWrapper {
-      override def configCB: CircuitBreakerConfig = CircuitBreakerConfig("Cip Validation", 2, 60.toDuration, 60.toDuration, 60.toDuration, 1, 0)
+    protected val circuitBreakers: CircuitBreakerWrapper = new CircuitBreakerWrapper {
+      override def configCB: CircuitBreakerConfig = CircuitBreakerConfig("Cip Validation", 2, 60.seconds, 60.seconds, 60.seconds, 1, 0)
 
       override def materializer: Materializer = Materializer(TestActorSystem.system)
-    }
-
-    implicit class IntToDuration(timeout: Int) {
-      def toDuration = Duration(timeout, java.util.concurrent.TimeUnit.SECONDS)
     }
 
     implicit val connectionFailure: Try[HttpResponse] => Boolean = {

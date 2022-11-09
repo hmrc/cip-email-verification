@@ -23,15 +23,15 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import play.api.http.Status.OK
 import play.api.test.Helpers.{await, defaultAwaitTimeout}
-import uk.gov.hmrc.cipemailverification.TestActorSystem
 import uk.gov.hmrc.cipemailverification.config.{AppConfig, CircuitBreakerConfig, GovNotifyConfig}
-import uk.gov.hmrc.cipemailverification.models.EmailPasscodeData
+import uk.gov.hmrc.cipemailverification.models.domain.data.EmailAndPasscodeData
+import uk.gov.hmrc.cipemailverification.utils.TestActorSystem
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.DurationInt
 
 class GovUkConnectorSpec extends AnyWordSpec
   with Matchers
@@ -57,7 +57,7 @@ class GovUkConnectorSpec extends AnyWordSpec
 
       appConfigMock.cacheExpiry.returns(1)
 
-      val result = govUkConnector.notificationStatus(notificationId)
+      private val result = govUkConnector.notificationStatus(notificationId)
       await(result).right.get.status shouldBe OK
 
       verify(
@@ -78,10 +78,9 @@ class GovUkConnectorSpec extends AnyWordSpec
 
       appConfigMock.passcodeExpiry.returns(15)
 
-      val now = System.currentTimeMillis()
-      val emailPasscodeData = EmailPasscodeData("test@test.com", "testPasscode", now)
+      private val emailPasscodeData = EmailAndPasscodeData("test@test.com", "testPasscode", System.currentTimeMillis())
 
-      val result = govUkConnector.sendPasscode(emailPasscodeData)
+      private val result = govUkConnector.sendPasscode(emailPasscodeData)
       await(result).right.get.status shouldBe OK
 
       verify(
@@ -103,12 +102,9 @@ class GovUkConnectorSpec extends AnyWordSpec
 
   trait SetUp {
     protected implicit val hc: HeaderCarrier = HeaderCarrier()
-    protected val appConfigMock = mock[AppConfig]
-    val cbConfigData = CircuitBreakerConfig("", 5, 5.toDuration, 30.toDuration, 5.toDuration, 1, 0)
 
-    implicit class IntToDuration(timeout: Int) {
-      def toDuration = Duration(timeout, java.util.concurrent.TimeUnit.SECONDS)
-    }
+    protected val appConfigMock: AppConfig = mock[AppConfig]
+    protected val cbConfigData: CircuitBreakerConfig = CircuitBreakerConfig("", 5, 5.seconds, 30.seconds, 5.seconds, 1, 0)
 
     val govUkConnector = new GovUkConnector(
       httpClientV2,

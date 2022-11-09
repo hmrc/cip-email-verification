@@ -23,22 +23,29 @@ import play.api.libs.json.Json
 import play.api.mvc.Results._
 import play.api.mvc.{ResponseHeader, Result}
 import uk.gov.hmrc.cipemailverification.connectors.GovUkConnector
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.{Codes, Message}
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.{Codes, Messages}
 import uk.gov.hmrc.cipemailverification.models.api.{ErrorResponse, NotificationStatus}
+import uk.gov.hmrc.cipemailverification.models.domain.audit.AuditType.EmailVerificationDeliveryResultRequest
+import uk.gov.hmrc.cipemailverification.models.domain.audit.VerificationDeliveryResultRequestAuditEvent
 import uk.gov.hmrc.cipemailverification.models.http.govnotify.GovUkNotificationStatusResponse
+import uk.gov.hmrc.cipemailverification.utils.GovNotifyUtils
 import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse, UpstreamErrorResponse}
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton()
-class NotificationService @Inject()(govUkConnector: GovUkConnector)
+class NotificationService @Inject()(govNotifyUtils: GovNotifyUtils, auditService: AuditService, govUkConnector: GovUkConnector)
                                    (implicit val executionContext: ExecutionContext) extends Logging {
+
+  private val NO_DATA_FOUND = "No_data_found"
 
   def status(notificationId: String)(implicit hc: HeaderCarrier): Future[Result] = {
     def success(response: HttpResponse) = {
 
       val govNotifyResponse: GovUkNotificationStatusResponse = response.json.as[GovUkNotificationStatusResponse]
+      val email = govNotifyResponse.email_address
+      val passcode = govNotifyUtils.extractPasscodeFromGovNotifyBody(govNotifyResponse.body)
       val deliveryStatus = govNotifyResponse.status
       val (notificationStatus, message) = deliveryStatus match {
         case "created" => ("CREATED", "Message is in the process of being sent")
@@ -50,6 +57,8 @@ class NotificationService @Inject()(govUkConnector: GovUkConnector)
         case "temporary-failure" => ("TEMPORARY_FAILURE", "Message was unable to be delivered by the network provider")
         case "technical-failure" => ("TECHNICAL_FAILURE", "There is a problem with the notification vendor")
       }
+      auditService.sendExplicitAuditEvent(EmailVerificationDeliveryResultRequest,
+        VerificationDeliveryResultRequestAuditEvent(email, passcode, notificationId, deliveryStatus))
       Ok(Json.toJson(NotificationStatus(notificationStatus, message)))
     }
 
@@ -57,13 +66,15 @@ class NotificationService @Inject()(govUkConnector: GovUkConnector)
       err.statusCode match {
         case NOT_FOUND =>
           logger.warn("Notification Id not found")
-          NotFound(Json.toJson(ErrorResponse(Codes.NOTIFICATION_NOT_FOUND.id, Message.NOTIFICATION_ID_NOT_FOUND)))
+          auditService.sendExplicitAuditEvent(EmailVerificationDeliveryResultRequest,
+            VerificationDeliveryResultRequestAuditEvent(NO_DATA_FOUND, NO_DATA_FOUND, notificationId, NO_DATA_FOUND))
+          NotFound(Json.toJson(ErrorResponse(Codes.NOTIFICATION_NOT_FOUND.id, Messages.NOTIFICATION_ID_NOT_FOUND)))
         case BAD_REQUEST =>
           logger.warn("Notification Id not valid")
-          BadRequest(Json.toJson(ErrorResponse(Codes.VALIDATION_ERROR.id, Message.NOTIFICATION_ID_VALIDATION)))
+          BadRequest(Json.toJson(ErrorResponse(Codes.VALIDATION_ERROR.id, Messages.NOTIFICATION_ID_VALIDATION)))
         case FORBIDDEN =>
           logger.warn(err.message)
-          ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE.id, Message.EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
+          ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE.id, Messages.EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
         case _ =>
           logger.error(err.message)
           Result.apply(ResponseHeader(err.statusCode), HttpEntity.NoEntity)
@@ -72,14 +83,12 @@ class NotificationService @Inject()(govUkConnector: GovUkConnector)
 
     govUkConnector.notificationStatus(notificationId).map {
       case Right(response) =>
-
-
         success(response)
       case Left(err) => failure(err)
     } recover {
       case err =>
         logger.error(err.getMessage)
-        GatewayTimeout(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVICE_TIMEOUT.id, Message.EXTERNAL_SERVER_TIMEOUT)))
+        GatewayTimeout(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVICE_TIMEOUT.id, Messages.EXTERNAL_SERVER_TIMEOUT)))
     }
   }
 }

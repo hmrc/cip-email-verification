@@ -21,8 +21,8 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import play.api.libs.json.JsObject
 import play.api.test.Helpers.{await, defaultAwaitTimeout}
-import uk.gov.hmrc.cipemailverification.models.EmailPasscodeData
 import uk.gov.hmrc.cipemailverification.models.api.Email
+import uk.gov.hmrc.cipemailverification.models.domain.data.EmailAndPasscodeData
 import uk.gov.hmrc.cipemailverification.repositories.PasscodeCacheRepository
 import uk.gov.hmrc.mongo.cache.{CacheItem, DataKey}
 
@@ -36,14 +36,13 @@ class PasscodeServiceSpec extends AnyWordSpec
 
   "persistPasscode" should {
     "return passcode" in new SetUp {
-      val email = Email("test@test.test")
+      private val email = Email("test@test.test")
       val passcode = "ABCDEF"
-      val now = System.currentTimeMillis()
-      val emailPasscodeDataToPersist = EmailPasscodeData(email.email, passcode = passcode, now)
+      private val emailPasscodeDataToPersist = EmailAndPasscodeData(email.email, passcode = passcode, System.currentTimeMillis())
       passcodeCacheRepositoryMock.put(email.email)(DataKey("cip-email-verification"), emailPasscodeDataToPersist)
         .returns(Future.successful(CacheItem("", JsObject.empty, Instant.EPOCH, Instant.EPOCH)))
 
-      val result = passcodeService.persistPasscode(emailPasscodeDataToPersist)
+      private val result = passcodeService.persistPasscode(emailPasscodeDataToPersist)
 
       await(result) shouldBe emailPasscodeDataToPersist
     }
@@ -51,17 +50,17 @@ class PasscodeServiceSpec extends AnyWordSpec
 
   "retrievePasscode" should {
     "return passcode" in new SetUp {
-      val now = System.currentTimeMillis()
-      val dataFromDb = EmailPasscodeData("test@test.test", "thePasscode", now)
-      passcodeCacheRepositoryMock.get[EmailPasscodeData]("test@test.test")(DataKey("cip-email-verification"))
+      private val now = System.currentTimeMillis()
+      private val dataFromDb = EmailAndPasscodeData("test@test.test", "thePasscode", now)
+      passcodeCacheRepositoryMock.get[EmailAndPasscodeData]("test@test.test")(DataKey("cip-email-verification"))
         .returns(Future.successful(Some(dataFromDb)))
-      val result = passcodeService.retrievePasscode("test@test.test")
-      await(result) shouldBe Some(EmailPasscodeData("test@test.test", "thePasscode", now))
+      private val result = passcodeService.retrievePasscode("test@test.test")
+      await(result) shouldBe Some(EmailAndPasscodeData("test@test.test", "thePasscode", now))
     }
   }
 
   trait SetUp {
-    val passcodeCacheRepositoryMock = mock[PasscodeCacheRepository]
-    val passcodeService: PasscodeService = new PasscodeService(passcodeCacheRepositoryMock)
+    protected val passcodeCacheRepositoryMock: PasscodeCacheRepository = mock[PasscodeCacheRepository]
+    protected val passcodeService: PasscodeService = new PasscodeService(passcodeCacheRepositoryMock)
   }
 }

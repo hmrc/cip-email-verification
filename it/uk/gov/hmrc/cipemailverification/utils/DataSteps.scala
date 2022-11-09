@@ -18,7 +18,7 @@ package uk.gov.hmrc.cipemailverification.utils
 import org.scalatestplus.play.guice.GuiceOneServerPerSuite
 import play.api.libs.json.Json
 import play.api.libs.ws.{WSClient, WSResponse}
-import uk.gov.hmrc.cipemailverification.models.domain.data.EmailAndPasscode
+import uk.gov.hmrc.cipemailverification.models.api.EmailAndPasscode
 import uk.gov.hmrc.cipemailverification.repositories.PasscodeCacheRepository
 import uk.gov.hmrc.mongo.cache.DataKey
 

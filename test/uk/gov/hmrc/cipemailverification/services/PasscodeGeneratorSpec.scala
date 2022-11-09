@@ -25,12 +25,12 @@ class PasscodeGeneratorSpec extends AnyWordSpec
   private val passcodeGenerator = new PasscodeGenerator()
 
   "create 6 digit passcode" in {
-    passcodeGenerator.passcodeGenerator.forall(y => y.isUpper) shouldBe true
-    passcodeGenerator.passcodeGenerator.forall(y => y.isLetter) shouldBe true
+    passcodeGenerator.passcodeGenerator().forall(y => y.isUpper) shouldBe true
+    passcodeGenerator.passcodeGenerator().forall(y => y.isLetter) shouldBe true
 
     val illegalChars = List('@', '£', '$', '%', '^', '&', '*', '(', ')', '-', '+')
-    passcodeGenerator.passcodeGenerator.toList map (y => assertResult(illegalChars contains y)(false))
+    passcodeGenerator.passcodeGenerator().toList map (y => assertResult(illegalChars contains y)(false))
 
-    passcodeGenerator.passcodeGenerator.length shouldBe 6
+    passcodeGenerator.passcodeGenerator().length shouldBe 6
   }
 }

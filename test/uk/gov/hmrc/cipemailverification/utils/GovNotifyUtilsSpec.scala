@@ -16,17 +16,19 @@
 
 package uk.gov.hmrc.cipemailverification.utils
 
-import javax.inject.Singleton
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
-@Singleton()
-class GovNotifyUtils {
+class GovNotifyUtilsSpec extends AnyWordSpec
+  with Matchers {
 
-  def extractPasscodeFromGovNotifyBody(body: String): String = {
-    val pattern = """verification code is (\w+)""".r.unanchored
-
-    body match {
-      case pattern(passcode) =>
-        passcode
+  "extractPasscodeFromGovNotifyBody" should {
+    "extract and return passcode from gov notify response body" in {
+      val body =
+        """CIP Email Verification Service: theTaxService needs to verify your email.
+          |Your email verification code is ABCDEF.
+          |Use this code within 10 minutes to verify your email.""".stripMargin
+      new GovNotifyUtils().extractPasscodeFromGovNotifyBody(body) shouldBe "ABCDEF"
     }
   }
 }

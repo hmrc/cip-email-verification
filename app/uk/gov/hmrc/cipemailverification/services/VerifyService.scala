@@ -22,9 +22,8 @@ import play.api.mvc.Results._
 import uk.gov.hmrc.cipemailverification.config.AppConfig
 import uk.gov.hmrc.cipemailverification.connectors.{GovUkConnector, ValidateConnector}
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Message._
-import uk.gov.hmrc.cipemailverification.models.api.{Email, ErrorResponse}
-import uk.gov.hmrc.cipemailverification.models.domain.data.EmailAndPasscode
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages._
+import uk.gov.hmrc.cipemailverification.models.api.{Email, EmailAndPasscode, ErrorResponse}
 import uk.gov.hmrc.cipemailverification.utils.DateTimeUtils
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -33,12 +32,14 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 class VerifyService @Inject()(passcodeGenerator: PasscodeGenerator,
+                              auditService: AuditService,
                               passcodeService: PasscodeService,
                               dateTimeUtils: DateTimeUtils,
                               govUkConnector: GovUkConnector,
                               validateConnector: ValidateConnector,
-                              config: AppConfig)(implicit val executionContext: ExecutionContext) extends
-  VerifyHelper(passcodeGenerator, passcodeService, govUkConnector, dateTimeUtils, config) {
+                              config: AppConfig)
+                             (implicit val executionContext: ExecutionContext) extends VerifyHelper(passcodeGenerator,
+  auditService, passcodeService, govUkConnector, dateTimeUtils, config) {
 
   def verifyEmail(email: Email)(implicit hc: HeaderCarrier): Future[Result] =
     validateConnector.callService(email.email) transformWith {
