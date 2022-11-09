@@ -45,6 +45,17 @@ class GovUkConnector @Inject()(httpClient: HttpClientV2, config: AppConfig)
     case Failure(_) => true
   }
 
+  def notificationStatus(notificationId: String)(implicit hc: HeaderCarrier): Future[Either[UpstreamErrorResponse, HttpResponse]] = {
+    withCircuitBreaker[Either[UpstreamErrorResponse, HttpResponse]](
+      httpClient
+        .get(url"${config.govNotifyConfig.host}/v2/notifications/$notificationId")
+        .setHeader((s"Authorization", s"Bearer $jwtBearerToken"))
+        .transform(_.withRequestFilter(AhcCurlRequestLogger()))
+        .withProxy
+        .execute[Either[UpstreamErrorResponse, HttpResponse]]
+    )
+  }
+
   def sendPasscode(emailPasscodeData: EmailPasscodeData)(implicit hc: HeaderCarrier): Future[Either[UpstreamErrorResponse, HttpResponse]] = {
     // TODO Build this elsewhere
     val passcodeRequest = Json.obj(
