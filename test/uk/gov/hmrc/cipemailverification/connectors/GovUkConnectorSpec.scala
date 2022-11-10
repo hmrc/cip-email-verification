@@ -17,8 +17,7 @@
 package uk.gov.hmrc.cipemailverification.connectors
 
 import com.github.tomakehurst.wiremock.client.WireMock._
-import org.mockito.Mockito.when
-import org.mockito.MockitoSugar.mock
+import org.mockito.IdiomaticMockito
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -39,7 +38,8 @@ class GovUkConnectorSpec extends AnyWordSpec
   with WireMockSupport
   with ScalaFutures
   with HttpClientV2Support
-  with TestActorSystem {
+  with TestActorSystem
+  with IdiomaticMockito {
 
   val notificationId = "test-notification-id"
   val emailUrl: String = "/v2/notifications/email"
@@ -52,10 +52,10 @@ class GovUkConnectorSpec extends AnyWordSpec
           .willReturn(aResponse())
       )
 
-      when(appConfigMock.govNotifyConfig).thenReturn(GovNotifyConfig(
+      appConfigMock.govNotifyConfig.returns(GovNotifyConfig(
         wireMockUrl, "template-id-fake", "", UUID.randomUUID().toString, cbConfigData))
 
-      when(appConfigMock.cacheExpiry).thenReturn(1)
+      appConfigMock.cacheExpiry.returns(1)
 
       val result = govUkConnector.notificationStatus(notificationId)
       await(result).right.get.status shouldBe OK
@@ -73,10 +73,10 @@ class GovUkConnectorSpec extends AnyWordSpec
           .willReturn(aResponse())
       )
 
-      when(appConfigMock.govNotifyConfig).thenReturn(GovNotifyConfig(
+      appConfigMock.govNotifyConfig.returns(GovNotifyConfig(
         wireMockUrl, "template-id-fake", "", UUID.randomUUID().toString, cbConfigData))
 
-      when(appConfigMock.passcodeExpiry).thenReturn(15)
+      appConfigMock.passcodeExpiry.returns(15)
 
       val now = System.currentTimeMillis()
       val emailPasscodeData = EmailPasscodeData("test@test.com", "testPasscode", now)
@@ -105,13 +105,14 @@ class GovUkConnectorSpec extends AnyWordSpec
     protected implicit val hc: HeaderCarrier = HeaderCarrier()
     protected val appConfigMock = mock[AppConfig]
     val cbConfigData = CircuitBreakerConfig("", 5, 5.toDuration, 30.toDuration, 5.toDuration, 1, 0)
+
     implicit class IntToDuration(timeout: Int) {
       def toDuration = Duration(timeout, java.util.concurrent.TimeUnit.SECONDS)
     }
+
     val govUkConnector = new GovUkConnector(
       httpClientV2,
       appConfigMock
     )
   }
-
 }

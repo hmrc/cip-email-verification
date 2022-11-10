@@ -17,8 +17,8 @@
 package uk.gov.hmrc.cipemailverification.repositories
 
 import uk.gov.hmrc.cipemailverification.config.AppConfig
-import uk.gov.hmrc.mongo.{MongoComponent, TimestampSupport}
 import uk.gov.hmrc.mongo.cache.{CacheIdType, MongoCacheRepository}
+import uk.gov.hmrc.mongo.{MongoComponent, TimestampSupport}
 
 import javax.inject.Inject
 import scala.concurrent.ExecutionContext
@@ -31,4 +31,3 @@ class PasscodeCacheRepository @Inject()(mongoComponent: MongoComponent, config: 
     ttl = config.cacheExpiry.minutes,
     timestampSupport = timestampSupport,
     cacheIdType = CacheIdType.SimpleCacheId)
-

@@ -21,6 +21,5 @@ import play.api.libs.json.Json
 case class Email(email: String)
 
 object Email {
-   implicit val emailReads = Json.reads[Email]
+  implicit val emailReads = Json.reads[Email]
 }
-

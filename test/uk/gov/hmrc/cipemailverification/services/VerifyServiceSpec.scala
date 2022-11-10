@@ -293,5 +293,3 @@ class VerifyServiceSpec extends AnyWordSpec
       appConfig)
   }
 }
-
-
