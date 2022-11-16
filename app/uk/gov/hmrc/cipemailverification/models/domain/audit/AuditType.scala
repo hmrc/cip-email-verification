@@ -14,19 +14,10 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.cipemailverification.utils
+package uk.gov.hmrc.cipemailverification.models.domain.audit
 
-import javax.inject.Singleton
+object AuditType extends Enumeration {
+  type Type = Value
 
-@Singleton()
-class GovNotifyUtils {
-
-  def extractPasscodeFromGovNotifyBody(body: String): String = {
-    val pattern = """verification code is (\w+)""".r.unanchored
-
-    body match {
-      case pattern(passcode) =>
-        passcode
-    }
-  }
+  val EmailVerificationRequest, EmailVerificationDeliveryResultRequest, EmailVerificationCheck = Value
 }

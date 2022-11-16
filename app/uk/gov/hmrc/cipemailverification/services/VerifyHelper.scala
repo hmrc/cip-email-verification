@@ -24,12 +24,13 @@ import play.api.mvc.Results.{Accepted, BadGateway, BadRequest, InternalServerErr
 import play.api.mvc.{ResponseHeader, Result}
 import uk.gov.hmrc.cipemailverification.config.AppConfig
 import uk.gov.hmrc.cipemailverification.connectors.GovUkConnector
-import uk.gov.hmrc.cipemailverification.models.EmailPasscodeData
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Message._
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages._
 import uk.gov.hmrc.cipemailverification.models.api.StatusMessage.{NOT_VERIFIED, VERIFIED}
-import uk.gov.hmrc.cipemailverification.models.api.{Email, ErrorResponse, VerificationStatus}
-import uk.gov.hmrc.cipemailverification.models.domain.data.EmailAndPasscode
+import uk.gov.hmrc.cipemailverification.models.api.{Email, EmailAndPasscode, ErrorResponse, VerificationStatus}
+import uk.gov.hmrc.cipemailverification.models.domain.audit.AuditType.{EmailVerificationCheck, EmailVerificationRequest}
+import uk.gov.hmrc.cipemailverification.models.domain.audit.{VerificationCheckAuditEvent, VerificationRequestAuditEvent}
+import uk.gov.hmrc.cipemailverification.models.domain.data.EmailAndPasscodeData
 import uk.gov.hmrc.cipemailverification.models.http.govnotify.GovUkNotificationId
 import uk.gov.hmrc.cipemailverification.models.http.validation.ValidatedEmail
 import uk.gov.hmrc.cipemailverification.utils.DateTimeUtils
@@ -42,6 +43,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
+                                      auditService: AuditService,
                                       passcodeService: PasscodeService,
                                       govUkConnector: GovUkConnector,
                                       dateTimeUtils: DateTimeUtils,
@@ -54,14 +56,17 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
     case _ if is2xx(res.status) => processValidEmailAddress(email)
     case _ if is4xx(res.status) => Future(BadRequest(res.json))
     case _ if is5xx(res.status) => Future(BadGateway(
-      Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_ERROR.id, EXTERNAL_SERVER_EXPERIENCED_AN_ISSUE))
+      Json.toJson(ErrorResponse(Codes.SERVER_CURRENTLY_UNAVAILABLE.id, SERVER_CURRENTLY_UNAVAILABLE))
     ))
   }
 
   private def processValidEmailAddress(email: Email)(implicit hc: HeaderCarrier): Future[Result] = {
     val passcode = passcodeGenerator.passcodeGenerator()
     val now = dateTimeUtils.getCurrentDateTime()
-    val dataToSave = new EmailPasscodeData(email.email, passcode, now)
+    val dataToSave = new EmailAndPasscodeData(email.email, passcode, now)
+    auditService.sendExplicitAuditEvent(EmailVerificationRequest,
+      VerificationRequestAuditEvent(dataToSave.email, passcode))
+
     passcodeService.persistPasscode(dataToSave) transformWith {
       case Success(savedEmailPasscodeData) => sendPasscode(savedEmailPasscodeData)
       case Failure(err) =>
@@ -92,33 +97,48 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
   }
 
   private def processPasscode(enteredEmailAndPasscode: EmailAndPasscode,
-                              maybeEmailAndPasscode: Option[EmailPasscodeData])(implicit hc: HeaderCarrier): Future[Result] =
+                              maybeEmailAndPasscode: Option[EmailAndPasscodeData])
+                             (implicit hc: HeaderCarrier): Future[Result] =
     maybeEmailAndPasscode match {
-      case Some(storedEmailAndpasscode) => checkIfPasscodeIsStillAllowedToBeUsed(enteredEmailAndPasscode, storedEmailAndpasscode, System.currentTimeMillis())
+      case Some(storedEmailAndPasscode) => checkIfPasscodeIsStillAllowedToBeUsed(enteredEmailAndPasscode, storedEmailAndPasscode, System.currentTimeMillis())
       case _ =>
+        auditService.sendExplicitAuditEvent(EmailVerificationCheck,
+          VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, NOT_VERIFIED, Some("Passcode does not exist")))
         Future.successful(Ok(Json.toJson(ErrorResponse(Codes.PASSCODE_ENTERED_EXPIRED_CACHE.id, PASSCODE_STORED_TIME_ELAPSED)))) //Done
     }
 
-  private def checkIfPasscodeIsStillAllowedToBeUsed(enteredEmailAndPasscode: EmailAndPasscode, foundEmailPasscodeData: EmailPasscodeData, now: Long)
+  private def checkIfPasscodeIsStillAllowedToBeUsed(enteredEmailAndPasscode: EmailAndPasscode,
+                                                    foundEmailPasscodeData: EmailAndPasscodeData, now: Long)
                                                    (implicit hc: HeaderCarrier): Future[Result] = {
-    hasPasscodeExpired(foundEmailPasscodeData: EmailPasscodeData, now) match {
-      case true =>
-        Future.successful(Ok(Json.toJson(ErrorResponse(Codes.PASSCODE_ENTERED_EXPIRED.id, PASSCODE_ALLOWED_TIME_ELAPSED)))) //Done
-      case false => checkIfPasscodeMatches(enteredEmailAndPasscode, foundEmailPasscodeData)
+    if (hasPasscodeExpired(foundEmailPasscodeData: EmailAndPasscodeData, now)) {
+      auditService.sendExplicitAuditEvent(EmailVerificationCheck,
+        VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, NOT_VERIFIED, Some("Passcode expired")))
+      Future.successful(Ok(Json.toJson(
+        ErrorResponse(Codes.PASSCODE_ENTERED_EXPIRED.id, PASSCODE_ALLOWED_TIME_ELAPSED)
+      )))
+    } else {
+      checkIfPasscodeMatches(enteredEmailAndPasscode, foundEmailPasscodeData)
     }
   }
 
-  private def hasPasscodeExpired(foundPhoneNumberPasscodeData: EmailPasscodeData, currentTime: Long): Boolean = {
+  private def hasPasscodeExpired(foundPhoneNumberPasscodeData: EmailAndPasscodeData, currentTime: Long): Boolean = {
     val elapsedTimeInMilliseconds: Long = calculateElapsedTime(foundPhoneNumberPasscodeData.createdAt, currentTime)
     val allowedTimeGapForPasscodeUsageInMilliseconds: Long = Duration.ofMinutes(passcodeExpiry).toMillis
     elapsedTimeInMilliseconds > allowedTimeGapForPasscodeUsageInMilliseconds
   }
 
   private def checkIfPasscodeMatches(enteredEmailAndPasscode: EmailAndPasscode,
-                                     maybeEmailAndPasscodeData: EmailPasscodeData)(implicit hc: HeaderCarrier): Future[Result] = {
-    passcodeMatches(enteredEmailAndPasscode.passcode, maybeEmailAndPasscodeData.passcode) match {
-      case true => Future.successful(Ok(Json.toJson(VerificationStatus(VERIFIED))))
-      case false => Future.successful(Ok(Json.toJson(VerificationStatus(NOT_VERIFIED))))
+                                     maybeEmailAndPasscodeData: EmailAndPasscodeData)
+                                    (implicit hc: HeaderCarrier): Future[Result] = {
+    if (passcodeMatches(enteredEmailAndPasscode.passcode, maybeEmailAndPasscodeData.passcode)) {
+      auditService.sendExplicitAuditEvent(EmailVerificationCheck,
+        VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, VERIFIED))
+      Future.successful(Ok(Json.toJson(VerificationStatus(VERIFIED))))
+    } else {
+
+      auditService.sendExplicitAuditEvent(EmailVerificationCheck,
+        VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, NOT_VERIFIED, Some("Passcode mismatch")))
+      Future.successful(Ok(Json.toJson(VerificationStatus(NOT_VERIFIED))))
     }
   }
 
@@ -130,7 +150,7 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
     timeB - timeA
   }
 
-  private def sendPasscode(data: EmailPasscodeData)
+  private def sendPasscode(data: EmailAndPasscodeData)
                           (implicit hc: HeaderCarrier) = govUkConnector.sendPasscode(data) map {
     case Left(error) => error.statusCode match {
       case INTERNAL_SERVER_ERROR =>

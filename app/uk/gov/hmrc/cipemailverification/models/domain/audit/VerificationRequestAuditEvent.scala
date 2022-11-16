@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.cipemailverification.models
+package uk.gov.hmrc.cipemailverification.models.domain.audit
 
-import play.api.libs.json.Json
+import play.api.libs.json.{Json, OWrites}
 
-case class EmailPasscodeData(email: String, passcode: String, createdAt: Long)
+case class VerificationRequestAuditEvent(email: String, passcode: String) extends AuditEvent(email, passcode)
 
-object EmailPasscodeData {
-  implicit val emailPasscodeDataFormat = Json.format[EmailPasscodeData]
+object VerificationRequestAuditEvent {
+  implicit val writes: OWrites[VerificationRequestAuditEvent] = Json.writes[VerificationRequestAuditEvent]
 }

@@ -16,10 +16,10 @@
 
 package uk.gov.hmrc.cipemailverification.models.api
 
-import play.api.libs.json.Json
+import play.api.libs.json.{Json, Reads}
 
 case class Email(email: String)
 
 object Email {
-  implicit val emailReads = Json.reads[Email]
+  implicit val reads: Reads[Email] = Json.reads[Email]
 }

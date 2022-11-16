@@ -21,10 +21,9 @@ import io.jsonwebtoken.security.Keys
 import io.jsonwebtoken.{Jwts, SignatureAlgorithm}
 import play.api.Logging
 import play.api.libs.json.Json
-import play.api.libs.ws.ahc.AhcCurlRequestLogger
 import play.api.libs.ws.writeableOf_JsValue
 import uk.gov.hmrc.cipemailverification.config.{AppConfig, CircuitBreakerConfig}
-import uk.gov.hmrc.cipemailverification.models.EmailPasscodeData
+import uk.gov.hmrc.cipemailverification.models.domain.data.EmailAndPasscodeData
 import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse, StringContextOps, UpstreamErrorResponse}
@@ -50,13 +49,12 @@ class GovUkConnector @Inject()(httpClient: HttpClientV2, config: AppConfig)
       httpClient
         .get(url"${config.govNotifyConfig.host}/v2/notifications/$notificationId")
         .setHeader((s"Authorization", s"Bearer $jwtBearerToken"))
-        .transform(_.withRequestFilter(AhcCurlRequestLogger()))
         .withProxy
         .execute[Either[UpstreamErrorResponse, HttpResponse]]
     )
   }
 
-  def sendPasscode(emailPasscodeData: EmailPasscodeData)(implicit hc: HeaderCarrier): Future[Either[UpstreamErrorResponse, HttpResponse]] = {
+  def sendPasscode(emailPasscodeData: EmailAndPasscodeData)(implicit hc: HeaderCarrier): Future[Either[UpstreamErrorResponse, HttpResponse]] = {
     // TODO Build this elsewhere
     val passcodeRequest = Json.obj(
       "email_address" -> s"${emailPasscodeData.email}",
@@ -71,7 +69,6 @@ class GovUkConnector @Inject()(httpClient: HttpClientV2, config: AppConfig)
       httpClient
         .post(url"${config.govNotifyConfig.host}/v2/notifications/email")
         .setHeader((s"Authorization", s"Bearer $jwtBearerToken"))
-        .transform(_.withRequestFilter(AhcCurlRequestLogger()))
         .withBody(Json.toJson(passcodeRequest))
         .withProxy
         .execute[Either[UpstreamErrorResponse, HttpResponse]]

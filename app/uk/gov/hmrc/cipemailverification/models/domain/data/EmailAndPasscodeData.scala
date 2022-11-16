@@ -14,19 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.cipemailverification.utils
+package uk.gov.hmrc.cipemailverification.models.domain.data
 
-import javax.inject.Singleton
+import play.api.libs.json.{Json, OFormat}
 
-@Singleton()
-class GovNotifyUtils {
+case class EmailAndPasscodeData(email: String, passcode: String, createdAt: Long)
 
-  def extractPasscodeFromGovNotifyBody(body: String): String = {
-    val pattern = """verification code is (\w+)""".r.unanchored
-
-    body match {
-      case pattern(passcode) =>
-        passcode
-    }
-  }
+object EmailAndPasscodeData {
+  implicit val format: OFormat[EmailAndPasscodeData] = Json.format[EmailAndPasscodeData]
 }
