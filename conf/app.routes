@@ -1,5 +1,5 @@
 # microservice specific routes
 
 POST       /verify                          uk.gov.hmrc.cipemailverification.controllers.VerifyController.verify
-POST       /verify/passcode                 uk.gov.hmrc.cipemailverification.controllers.PasscodeController.verifyPasscode
+POST       /verify/passcode                 uk.gov.hmrc.cipemailverification.controllers.VerifyPasscodeController.verifyPasscode
 GET        /notifications/:notificationId   uk.gov.hmrc.cipemailverification.controllers.NotificationController.status(notificationId: String)

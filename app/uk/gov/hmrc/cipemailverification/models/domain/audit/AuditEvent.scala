@@ -16,4 +16,27 @@
 
 package uk.gov.hmrc.cipemailverification.models.domain.audit
 
-abstract class AuditEvent(email: String, passcode: String)
+import play.api.libs.json.{Json, OWrites}
+
+sealed class AuditEvent(email: String, passcode: String)
+
+sealed case class VerificationCheckAuditEvent(email: String, passcode: String, result: String,
+                                              failureReason: Option[String] = None) extends AuditEvent(email, passcode)
+
+object VerificationCheckAuditEvent {
+  implicit val writes: OWrites[VerificationCheckAuditEvent] = Json.writes[VerificationCheckAuditEvent]
+}
+
+sealed case class VerificationDeliveryResultRequestAuditEvent(email: String, passcode: String, notificationId: String,
+                                                              notificationStatus: String) extends AuditEvent(email, passcode)
+
+object VerificationDeliveryResultRequestAuditEvent {
+  implicit val writes: OWrites[VerificationDeliveryResultRequestAuditEvent] =
+    Json.writes[VerificationDeliveryResultRequestAuditEvent]
+}
+
+sealed case class VerificationRequestAuditEvent(email: String, passcode: String) extends AuditEvent(email, passcode)
+
+object VerificationRequestAuditEvent {
+  implicit val writes: OWrites[VerificationRequestAuditEvent] = Json.writes[VerificationRequestAuditEvent]
+}

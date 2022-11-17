@@ -45,6 +45,9 @@ For reference here are the details for running each of the services individually
     cd cip-email-verification
     sbt run
 
+    cd cip-email-stubs
+    sbt run
+
 ### Curl microservice (for curl microservice build jobs)
 
 #### Verify
@@ -62,8 +65,8 @@ For reference here are the details for running each of the services individually
 
     -XPOST -H "Content-type: application/json" -H "Authorization: TY8wpfCH-cyTL8mBiAsoPlbMW5eNYcdONHb0wNCWxlkP18UJoiIqBtbWbXCzgnlKWylcODd5y" -d '{
 	    "email": "<email>",
-        "otp": "<otp>"
-    }' 'https://cip-email-verification.protected.mdtp/customer-insight-platform/email/verify/otp'
+        "passcode": "<passcode>"
+    }' 'https://cip-email-verification.protected.mdtp/customer-insight-platform/email/verify/passcode'
 
 ### License
 

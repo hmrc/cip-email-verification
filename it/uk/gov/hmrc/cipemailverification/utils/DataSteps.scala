@@ -32,7 +32,7 @@ trait DataSteps {
   val wsClient: WSClient = app.injector.instanceOf[WSClient]
   val baseUrl = s"http://localhost:$port"
 
-  //mimics user reading text message
+  //mimics user reading email
   def retrievePasscode(email: String): Future[Option[EmailAndPasscode]] = {
     repository.get[EmailAndPasscode](email)(DataKey("cip-email-verification"))
   }

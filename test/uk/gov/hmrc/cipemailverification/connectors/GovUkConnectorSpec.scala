@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.cipemailverification.connectors
 
+import com.github.tomakehurst.wiremock.client.WireMock
 import com.github.tomakehurst.wiremock.client.WireMock._
 import org.mockito.IdiomaticMockito
 import org.scalatest.concurrent.ScalaFutures
@@ -48,7 +49,7 @@ class GovUkConnectorSpec extends AnyWordSpec
   "notificationStatus" should {
     "delegate to http client" in new SetUp {
       stubFor(
-        get(urlEqualTo(notificationsUrl))
+        WireMock.get(urlEqualTo(notificationsUrl))
           .willReturn(aResponse())
       )
 
@@ -58,7 +59,7 @@ class GovUkConnectorSpec extends AnyWordSpec
       appConfigMock.cacheExpiry.returns(1)
 
       private val result = govUkConnector.notificationStatus(notificationId)
-      await(result).right.get.status shouldBe OK
+      await(result).status shouldBe OK
 
       verify(
         getRequestedFor(urlEqualTo(notificationsUrl))
@@ -81,7 +82,7 @@ class GovUkConnectorSpec extends AnyWordSpec
       private val emailPasscodeData = EmailAndPasscodeData("test@test.com", "testPasscode", System.currentTimeMillis())
 
       private val result = govUkConnector.sendPasscode(emailPasscodeData)
-      await(result).right.get.status shouldBe OK
+      await(result).status shouldBe OK
 
       verify(
         postRequestedFor(urlEqualTo(emailUrl)).withRequestBody(equalToJson(
@@ -104,7 +105,8 @@ class GovUkConnectorSpec extends AnyWordSpec
     protected implicit val hc: HeaderCarrier = HeaderCarrier()
 
     protected val appConfigMock: AppConfig = mock[AppConfig]
-    protected val cbConfigData: CircuitBreakerConfig = CircuitBreakerConfig("", 5, 5.seconds, 30.seconds, 5.seconds, 1, 0)
+    protected val cbConfigData: CircuitBreakerConfig =
+      CircuitBreakerConfig("", 5, 5.seconds, 30.seconds, 5.seconds, 1, 0)
 
     val govUkConnector = new GovUkConnector(
       httpClientV2,

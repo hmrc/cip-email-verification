@@ -17,21 +17,16 @@
 package uk.gov.hmrc.cipemailverification.services
 
 import play.api.Logging
-import play.api.http.HttpEntity
 import play.api.http.Status.{BAD_REQUEST, FORBIDDEN, INTERNAL_SERVER_ERROR, TOO_MANY_REQUESTS}
-import play.api.libs.json.Json
-import play.api.mvc.Results.{Accepted, BadGateway, BadRequest, InternalServerError, Ok, ServiceUnavailable, TooManyRequests}
-import play.api.mvc.{ResponseHeader, Result}
 import uk.gov.hmrc.cipemailverification.config.AppConfig
 import uk.gov.hmrc.cipemailverification.connectors.GovUkConnector
 import uk.gov.hmrc.cipemailverification.metrics.MetricsService
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages._
-import uk.gov.hmrc.cipemailverification.models.api.StatusMessage.{NOT_VERIFIED, VERIFIED}
-import uk.gov.hmrc.cipemailverification.models.api.{Email, EmailAndPasscode, ErrorResponse, VerificationStatus}
+import uk.gov.hmrc.cipemailverification.models.api.VerificationStatus.Messages.{NOT_VERIFIED, VERIFIED}
+import uk.gov.hmrc.cipemailverification.models.api.{Email, EmailAndPasscode}
 import uk.gov.hmrc.cipemailverification.models.domain.audit.AuditType.{EmailVerificationCheck, EmailVerificationRequest}
 import uk.gov.hmrc.cipemailverification.models.domain.audit.{VerificationCheckAuditEvent, VerificationRequestAuditEvent}
 import uk.gov.hmrc.cipemailverification.models.domain.data.EmailAndPasscodeData
+import uk.gov.hmrc.cipemailverification.models.domain.result._
 import uk.gov.hmrc.cipemailverification.models.http.govnotify.GovUkNotificationId
 import uk.gov.hmrc.cipemailverification.models.http.validation.ValidatedEmail
 import uk.gov.hmrc.cipemailverification.utils.DateTimeUtils
@@ -54,15 +49,29 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
 
   private val passcodeExpiry = config.passcodeExpiry
 
-  protected def processResponse(res: HttpResponse, email: Email)(implicit hc: HeaderCarrier): Future[Result] = res match {
+  protected def processResponse(res: HttpResponse, email: Email)
+                               (implicit hc: HeaderCarrier): Future[Either[ApplicationError, VerifyResult]] = res match {
     case _ if is2xx(res.status) => processValidEmailAddress(email)
-    case _ if is4xx(res.status) => Future(BadRequest(res.json))
-    case _ if is5xx(res.status) => Future(BadGateway(
-      Json.toJson(ErrorResponse(Codes.SERVER_CURRENTLY_UNAVAILABLE.id, SERVER_CURRENTLY_UNAVAILABLE))
-    ))
+    case _ if is4xx(res.status) =>
+      logger.warn(res.body)
+      Future.successful(Left(ValidationError))
+    case _ if is5xx(res.status) =>
+      logger.error(res.body)
+      Future.successful(Left(ValidationServiceError))
   }
 
-  private def processValidEmailAddress(email: Email)(implicit hc: HeaderCarrier): Future[Result] = {
+  protected def processResponseForPasscode(res: HttpResponse, emailAndPasscode: EmailAndPasscode)
+                                          (implicit hc: HeaderCarrier): Future[Either[ApplicationError, VerifyResult]] = res match {
+    case _ if is2xx(res.status) => processValidPasscode(res.json.as[ValidatedEmail], emailAndPasscode.passcode)
+    case _ if is4xx(res.status) =>
+      logger.warn(res.body)
+      Future.successful(Left(ValidationError))
+    case _ if is5xx(res.status) =>
+      logger.error(res.body)
+      Future.successful(Left(ValidationServiceError))
+  }
+
+  private def processValidEmailAddress(email: Email)(implicit hc: HeaderCarrier) = {
     val passcode = passcodeGenerator.passcodeGenerator()
     val now = dateTimeUtils.getCurrentDateTime()
     val dataToSave = new EmailAndPasscodeData(email.email, passcode, now)
@@ -74,17 +83,8 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
       case Failure(err) =>
         metricsService.recordMetric("mongo_cache_failure")
         logger.error(s"Database operation failed, ${err.getMessage}")
-        Future.successful(InternalServerError(Json.toJson(ErrorResponse(Codes.PASSCODE_PERSISTING_FAIL.id, SERVER_EXPERIENCED_AN_ISSUE))))
+        Future.successful(Left(DatabaseServiceDown))
     }
-  }
-
-  protected def processResponseForPasscode(res: HttpResponse, emailAndPasscode: EmailAndPasscode)
-                                          (implicit hc: HeaderCarrier): Future[Result] = res match {
-    case _ if is2xx(res.status) => processValidPasscode(res.json.as[ValidatedEmail], emailAndPasscode.passcode)
-    case _ if is4xx(res.status) => Future(BadRequest(res.json))
-    case _ if is5xx(res.status) => Future(BadGateway(
-      Json.toJson(ErrorResponse(Codes.SERVER_CURRENTLY_UNAVAILABLE.id, SERVER_CURRENTLY_UNAVAILABLE)) //TODO
-    ))
   }
 
   private def processValidPasscode(validatedEmail: ValidatedEmail, passcode: String)
@@ -96,37 +96,38 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
       case err =>
         metricsService.recordMetric("mongo_cache_failure")
         logger.error(s"Database operation failed - ${err.getMessage}")
-        InternalServerError(Json.toJson(ErrorResponse(Codes.PASSCODE_CHECK_FAIL.id, SERVER_EXPERIENCED_AN_ISSUE))) //Done
+        Left(DatabaseServiceDown)
     }
   }
 
   private def processPasscode(enteredEmailAndPasscode: EmailAndPasscode,
                               maybeEmailAndPasscode: Option[EmailAndPasscodeData])
-                             (implicit hc: HeaderCarrier): Future[Result] =
+                             (implicit hc: HeaderCarrier) =
     maybeEmailAndPasscode match {
-      case Some(storedEmailAndPasscode) => checkIfPasscodeIsStillAllowedToBeUsed(enteredEmailAndPasscode, storedEmailAndPasscode, System.currentTimeMillis())
+      case Some(storedEmailAndPasscode) => checkIfPasscodeIsStillAllowedToBeUsed(enteredEmailAndPasscode,
+        storedEmailAndPasscode, System.currentTimeMillis())
       case _ =>
         auditService.sendExplicitAuditEvent(EmailVerificationCheck,
-          VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, NOT_VERIFIED, Some("Passcode does not exist")))
-        Future.successful(Ok(Json.toJson(ErrorResponse(Codes.PASSCODE_ENTERED_EXPIRED_CACHE.id, PASSCODE_STORED_TIME_ELAPSED)))) //Done
+          VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, NOT_VERIFIED,
+            Some("Passcode does not exist")))
+        Future.successful(Left(NotFound))
     }
 
   private def checkIfPasscodeIsStillAllowedToBeUsed(enteredEmailAndPasscode: EmailAndPasscode,
                                                     foundEmailPasscodeData: EmailAndPasscodeData, now: Long)
-                                                   (implicit hc: HeaderCarrier): Future[Result] = {
+                                                   (implicit hc: HeaderCarrier) = {
     if (hasPasscodeExpired(foundEmailPasscodeData: EmailAndPasscodeData, now)) {
       metricsService.recordMetric("passcode_verification_success")
       auditService.sendExplicitAuditEvent(EmailVerificationCheck,
-        VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, NOT_VERIFIED, Some("Passcode expired")))
-      Future.successful(Ok(Json.toJson(
-        ErrorResponse(Codes.PASSCODE_ENTERED_EXPIRED.id, PASSCODE_ALLOWED_TIME_ELAPSED)
-      )))
+        VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, NOT_VERIFIED,
+          Some("Passcode expired")))
+      Future.successful(Right(PasscodeExpired))
     } else {
       checkIfPasscodeMatches(enteredEmailAndPasscode, foundEmailPasscodeData)
     }
   }
 
-  private def hasPasscodeExpired(foundPhoneNumberPasscodeData: EmailAndPasscodeData, currentTime: Long): Boolean = {
+  private def hasPasscodeExpired(foundPhoneNumberPasscodeData: EmailAndPasscodeData, currentTime: Long) = {
     val elapsedTimeInMilliseconds: Long = calculateElapsedTime(foundPhoneNumberPasscodeData.createdAt, currentTime)
     val allowedTimeGapForPasscodeUsageInMilliseconds: Long = Duration.ofMinutes(passcodeExpiry).toMillis
     elapsedTimeInMilliseconds > allowedTimeGapForPasscodeUsageInMilliseconds
@@ -134,20 +135,21 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
 
   private def checkIfPasscodeMatches(enteredEmailAndPasscode: EmailAndPasscode,
                                      maybeEmailAndPasscodeData: EmailAndPasscodeData)
-                                    (implicit hc: HeaderCarrier): Future[Result] = {
+                                    (implicit hc: HeaderCarrier) = {
     if (passcodeMatches(enteredEmailAndPasscode.passcode, maybeEmailAndPasscodeData.passcode)) {
       auditService.sendExplicitAuditEvent(EmailVerificationCheck,
         VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, VERIFIED))
-      Future.successful(Ok(Json.toJson(VerificationStatus(VERIFIED))))
+      Future.successful(Right(Verified))
     } else {
 
       auditService.sendExplicitAuditEvent(EmailVerificationCheck,
-        VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, NOT_VERIFIED, Some("Passcode mismatch")))
-      Future.successful(Ok(Json.toJson(VerificationStatus(NOT_VERIFIED))))
+        VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, NOT_VERIFIED,
+          Some("Passcode mismatch")))
+      Future.successful(Right(NotVerified))
     }
   }
 
-  private def passcodeMatches(enteredPasscode: String, storedPasscode: String): Boolean = {
+  private def passcodeMatches(enteredPasscode: String, storedPasscode: String) = {
     enteredPasscode.equals(storedPasscode)
   }
 
@@ -156,37 +158,46 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
   }
 
   private def sendPasscode(data: EmailAndPasscodeData)
-                          (implicit hc: HeaderCarrier) = govUkConnector.sendPasscode(data) map {
-    case Left(error) => error.statusCode match {
-      case INTERNAL_SERVER_ERROR =>
-        metricsService.recordMetric(s"UpstreamErrorResponse.${error.statusCode}")
-        logger.error(error.getMessage)
-        BadGateway(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_ERROR.id, EXTERNAL_SERVER_EXPERIENCED_AN_ISSUE)))
-      case BAD_REQUEST =>
-        metricsService.recordMetric(s"UpstreamErrorResponse.${error.statusCode}")
-        logger.error(error.getMessage)
-        ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_FAIL_VALIDATION.id, SERVER_EXPERIENCED_AN_ISSUE)))
-      case FORBIDDEN =>
-        metricsService.recordMetric(s"UpstreamErrorResponse.${error.statusCode}")
-        logger.error(error.getMessage)
-        ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_FAIL_FORBIDDEN.id, SERVER_EXPERIENCED_AN_ISSUE)))
-      case TOO_MANY_REQUESTS =>
-        metricsService.recordMetric(s"UpstreamErrorResponse.${error.statusCode}")
-        logger.error(error.getMessage)
-        TooManyRequests(Json.toJson(ErrorResponse(Codes.MESSAGE_THROTTLED_OUT.id, THROTTLED_TOO_MANY_REQUESTS)))
-      case _ =>
-        metricsService.recordMetric(s"UpstreamErrorResponse.${error.statusCode}")
-        logger.error(error.getMessage)
-        Result.apply(ResponseHeader(error.statusCode), HttpEntity.NoEntity)
+                          (implicit hc: HeaderCarrier) = {
+    def success(response: HttpResponse) = {
+      Right(PasscodeSent(response.json.as[GovUkNotificationId]))
     }
-    case Right(response) if response.status == 201 =>
-      metricsService.recordMetric("gov-notify_call_success")
-      Accepted.withHeaders(("Location", s"/notifications/${response.json.as[GovUkNotificationId].id}"))
-  } recover {
-    case err =>
-      logger.error(err.getMessage)
-      metricsService.recordMetric(err.toString.trim.dropRight(1))
-      metricsService.recordMetric("gov-notify_connection_failure")
-      ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE.id, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
+
+    def failure(response: HttpResponse) = {
+      response.status match {
+        case INTERNAL_SERVER_ERROR =>
+          metricsService.recordMetric(s"UpstreamErrorResponse.${response.status}")
+          logger.error(response.body)
+          Left(GovNotifyServerError)
+        case BAD_REQUEST =>
+          logger.error(response.body)
+          metricsService.recordMetric(s"UpstreamErrorResponse.${response.status}")
+          Left(GovNotifyBadRequest)
+        case FORBIDDEN =>
+          logger.error(response.body)
+          metricsService.recordMetric(s"UpstreamErrorResponse.${response.status}")
+          Left(GovNotifyForbidden)
+        case TOO_MANY_REQUESTS =>
+          logger.error(response.body)
+          metricsService.recordMetric(s"UpstreamErrorResponse.${response.status}")
+          Left(GovNotifyTooManyRequests)
+        case _ =>
+          logger.error(response.body)
+          metricsService.recordMetric(s"UpstreamErrorResponse.${response.status}")
+          Left(GovNotifyServerError)
+      }
+    }
+
+    govUkConnector.sendPasscode(data) transformWith {
+      case Success(response) => response match {
+        case _ if is2xx(response.status) => Future.successful(success(response))
+        case _ => Future.successful(failure(response))
+      }
+      case Failure(response) =>
+        metricsService.recordMetric(response.toString.trim.dropRight(1))
+        metricsService.recordMetric("gov-notify_connection_failure")
+        logger.error(response.getMessage)
+        Future.successful(Left(GovNotifyServiceDown))
+    }
   }
 }

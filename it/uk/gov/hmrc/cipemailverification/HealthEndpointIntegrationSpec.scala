@@ -21,6 +21,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.play.guice.GuiceOneServerPerSuite
 import play.api.libs.ws.WSClient
+import play.api.libs.ws.ahc.AhcCurlRequestLogger
 
 class HealthEndpointIntegrationSpec extends AnyWordSpec
   with Matchers
@@ -37,6 +38,7 @@ class HealthEndpointIntegrationSpec extends AnyWordSpec
         wsClient
           .url(s"$baseUrl/ping/ping")
           .withHttpHeaders(("Authorization", "fake-token"))
+          .withRequestFilter(AhcCurlRequestLogger())
           .get()
           .futureValue
 
@@ -44,4 +46,3 @@ class HealthEndpointIntegrationSpec extends AnyWordSpec
     }
   }
 }
-

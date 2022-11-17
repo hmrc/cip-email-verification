@@ -17,9 +17,37 @@
 package uk.gov.hmrc.cipemailverification.models.api
 
 import play.api.libs.json.{Json, OWrites}
+import uk.gov.hmrc.cipemailverification.models.api.NotificationStatus.Messages.Message
+import uk.gov.hmrc.cipemailverification.models.api.NotificationStatus.Statuses.Status
 
-case class NotificationStatus(notificationStatus: String, message: String)
+case class NotificationStatus(notificationStatus: Status, message: Message)
 
 object NotificationStatus {
   implicit val writes: OWrites[NotificationStatus] = Json.writes[NotificationStatus]
+
+  object Statuses extends Enumeration {
+    type Status = Value
+
+    val CREATED,
+    SENDING,
+    PENDING,
+    SENT,
+    DELIVERED,
+    PERMANENT_FAILURE,
+    TEMPORARY_FAILURE,
+    TECHNICAL_FAILURE = Value
+  }
+
+  object Messages extends Enumeration {
+    type Message = String
+
+    val CREATED = "Message is in the process of being sent"
+    val SENDING = "Message has been sent"
+    val PENDING = "Message is in the process of being delivered"
+    val SENT = "Message was sent successfully"
+    val DELIVERED = "Message was delivered successfully"
+    val PERMANENT_FAILURE = "Message was unable to be delivered by the network provider"
+    val TEMPORARY_FAILURE = "Message was unable to be delivered by the network provider"
+    val TECHNICAL_FAILURE = "There is a problem with the notification vendor"
+  }
 }

@@ -41,6 +41,7 @@ class NotificationIntegrationSpec
         wsClient
           .url(s"$baseUrl/customer-insight-platform/email$notificationPath")
           .withHttpHeaders(("Authorization", "fake-token"))
+          .withRequestFilter(AhcCurlRequestLogger())
           .get
           .futureValue
 
@@ -59,7 +60,7 @@ class NotificationIntegrationSpec
           .futureValue
 
       response.status shouldBe 404
-      (response.json \ "code").as[Int] shouldBe Codes.NOTIFICATION_NOT_FOUND.id
+      (response.json \ "code").as[Int] shouldBe Codes.NOTIFICATION_NOT_FOUND
       (response.json \ "message").as[String] shouldBe "Notification Id not found"
     }
 
@@ -73,7 +74,7 @@ class NotificationIntegrationSpec
           .futureValue
 
       response.status shouldBe 503
-      (response.json \ "code").as[Int] shouldBe Codes.EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE.id
+      (response.json \ "code").as[Int] shouldBe Codes.EXTERNAL_SERVER_UNREACHABLE
       (response.json \ "message").as[String] shouldBe "External server currently unavailable"
     }
   }

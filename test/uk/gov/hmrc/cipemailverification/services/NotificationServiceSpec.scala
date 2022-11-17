@@ -22,17 +22,16 @@ import org.mockito.IdiomaticMockito
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import play.api.http.Status
-import play.api.http.Status.{BAD_REQUEST, GATEWAY_TIMEOUT, NOT_FOUND, OK, SERVICE_UNAVAILABLE}
 import play.api.libs.json.Format.GenericFormat
 import play.api.libs.json._
 import play.api.test.Helpers._
 import uk.gov.hmrc.cipemailverification.connectors.GovUkConnector
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.{Codes, Messages}
 import uk.gov.hmrc.cipemailverification.models.domain.audit.AuditType.EmailVerificationDeliveryResultRequest
 import uk.gov.hmrc.cipemailverification.models.domain.audit.VerificationDeliveryResultRequestAuditEvent
+import uk.gov.hmrc.cipemailverification.models.domain.result._
 import uk.gov.hmrc.cipemailverification.models.http.govnotify.GovUkNotificationStatusResponse
 import uk.gov.hmrc.cipemailverification.utils.GovNotifyUtils
-import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse, UpstreamErrorResponse}
+import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -43,189 +42,168 @@ class NotificationServiceSpec extends AnyWordSpec
   with IdiomaticMockito {
 
   "status" should {
-    "return NotificationStatus for created status" in new SetUp {
+    "return Created for created status" in new SetUp {
       private val govUkNotificationStatus = buildGovNotifyResponseWithStatus("created")
       private val httpResponse = HttpResponse(Status.OK, Json.toJson(govUkNotificationStatus), Map.empty[String, Seq[String]])
       mockGovUkConnector.notificationStatus(notificationId)
-        .returns(Future.successful(Right(httpResponse)))
+        .returns(Future.successful(httpResponse))
 
-      private val result = service.status(notificationId)
+      private val result = await(service.status(notificationId))
 
-      status(result) shouldBe OK
-      (contentAsJson(result) \ "notificationStatus").as[String] shouldBe "CREATED"
-      (contentAsJson(result) \ "message").as[String] shouldBe "Message is in the process of being sent"
+      result shouldBe Right(Created)
 
       mockGovNotifyUtils.extractPasscodeFromGovNotifyBody(expectedGovNotifyResponseBody) was called
       private val expectedAuditEvent = VerificationDeliveryResultRequestAuditEvent(expectedEmail, passcode, notificationId, "created")
       mockAuditService.sendExplicitAuditEvent(EmailVerificationDeliveryResultRequest, expectedAuditEvent) was called
     }
 
-    "return NotificationStatus for sending status" in new SetUp {
+    "return Sending for sending status" in new SetUp {
       private val govUkNotificationStatus = buildGovNotifyResponseWithStatus("sending")
       private val httpResponse = HttpResponse(Status.OK, Json.toJson(govUkNotificationStatus), Map.empty[String, Seq[String]])
       mockGovUkConnector.notificationStatus(notificationId)
-        .returns(Future.successful(Right(httpResponse)))
+        .returns(Future.successful(httpResponse))
 
-      private val result = service.status(notificationId)
+      private val result = await(service.status(notificationId))
 
-      status(result) shouldBe OK
-      (contentAsJson(result) \ "notificationStatus").as[String] shouldBe "SENDING"
-      (contentAsJson(result) \ "message").as[String] shouldBe "Message has been sent"
+      result shouldBe Right(Sending)
 
       mockGovNotifyUtils.extractPasscodeFromGovNotifyBody(expectedGovNotifyResponseBody) was called
       private val expectedAuditEvent = VerificationDeliveryResultRequestAuditEvent(expectedEmail, passcode, notificationId, "sending")
       mockAuditService.sendExplicitAuditEvent(EmailVerificationDeliveryResultRequest, expectedAuditEvent) was called
     }
 
-    "return NotificationStatus for pending status" in new SetUp {
+    "return Pending for pending status" in new SetUp {
       private val govUkNotificationStatus = buildGovNotifyResponseWithStatus("pending")
       private val httpResponse = HttpResponse(Status.OK, Json.toJson(govUkNotificationStatus), Map.empty[String, Seq[String]])
       mockGovUkConnector.notificationStatus(notificationId)
-        .returns(Future.successful(Right(httpResponse)))
+        .returns(Future.successful(httpResponse))
 
-      private val result = service.status(notificationId)
+      private val result = await(service.status(notificationId))
 
-      status(result) shouldBe OK
-      (contentAsJson(result) \ "notificationStatus").as[String] shouldBe "PENDING"
-      (contentAsJson(result) \ "message").as[String] shouldBe "Message is in the process of being delivered"
+      result shouldBe Right(Pending)
 
       mockGovNotifyUtils.extractPasscodeFromGovNotifyBody(expectedGovNotifyResponseBody) was called
       private val expectedAuditEvent = VerificationDeliveryResultRequestAuditEvent(expectedEmail, passcode, notificationId, "pending")
       mockAuditService.sendExplicitAuditEvent(EmailVerificationDeliveryResultRequest, expectedAuditEvent) was called
     }
 
-    "return NotificationStatus for sent (international number) status" in new SetUp {
+    "return Sent for sent (international number) status" in new SetUp {
       private val govUkNotificationStatus = buildGovNotifyResponseWithStatus("sent")
       private val httpResponse = HttpResponse(Status.OK, Json.toJson(govUkNotificationStatus), Map.empty[String, Seq[String]])
       mockGovUkConnector.notificationStatus(notificationId)
-        .returns(Future.successful(Right(httpResponse)))
+        .returns(Future.successful(httpResponse))
 
-      private val result = service.status(notificationId)
+      private val result = await(service.status(notificationId))
 
-      status(result) shouldBe OK
-      (contentAsJson(result) \ "notificationStatus").as[String] shouldBe "SENT"
-      (contentAsJson(result) \ "message").as[String] shouldBe "Message was sent successfully"
+      result shouldBe Right(Sent)
 
       mockGovNotifyUtils.extractPasscodeFromGovNotifyBody(expectedGovNotifyResponseBody) was called
       private val expectedAuditEvent = VerificationDeliveryResultRequestAuditEvent(expectedEmail, passcode, notificationId, "sent")
       mockAuditService.sendExplicitAuditEvent(EmailVerificationDeliveryResultRequest, expectedAuditEvent) was called
     }
 
-    "return NotificationStatus for delivered status" in new SetUp {
+    "return Delivered for delivered status" in new SetUp {
       private val govUkNotificationStatus = buildGovNotifyResponseWithStatus("delivered")
       private val httpResponse = HttpResponse(Status.OK, Json.toJson(govUkNotificationStatus), Map.empty[String, Seq[String]])
       mockGovUkConnector.notificationStatus(notificationId)
-        .returns(Future.successful(Right(httpResponse)))
+        .returns(Future.successful(httpResponse))
 
-      private val result = service.status(notificationId)
+      private val result = await(service.status(notificationId))
 
-      status(result) shouldBe OK
-      (contentAsJson(result) \ "notificationStatus").as[String] shouldBe "DELIVERED"
-      (contentAsJson(result) \ "message").as[String] shouldBe "Message was delivered successfully"
+      result shouldBe Right(Delivered)
     }
 
-    "return NotificationStatus for permanent-failure status" in new SetUp {
+    "return PermanentFailure for permanent-failure status" in new SetUp {
       private val govUkNotificationStatus = buildGovNotifyResponseWithStatus("permanent-failure")
       private val httpResponse = HttpResponse(Status.OK, Json.toJson(govUkNotificationStatus), Map.empty[String, Seq[String]])
       mockGovUkConnector.notificationStatus(notificationId)
-        .returns(Future.successful(Right(httpResponse)))
+        .returns(Future.successful(httpResponse))
 
-      private val result = service.status(notificationId)
+      private val result = await(service.status(notificationId))
 
-      status(result) shouldBe OK
-      (contentAsJson(result) \ "notificationStatus").as[String] shouldBe "PERMANENT_FAILURE"
-      (contentAsJson(result) \ "message").as[String] shouldBe
-        "Message was unable to be delivered by the network provider"
+      result shouldBe Right(PermanentFailure)
 
       mockGovNotifyUtils.extractPasscodeFromGovNotifyBody(expectedGovNotifyResponseBody) was called
-      private val expectedAuditEvent = VerificationDeliveryResultRequestAuditEvent(expectedEmail, passcode, notificationId, "permanent-failure")
+      private val expectedAuditEvent = VerificationDeliveryResultRequestAuditEvent(expectedEmail, passcode,
+        notificationId, "permanent-failure")
       mockAuditService.sendExplicitAuditEvent(EmailVerificationDeliveryResultRequest, expectedAuditEvent) was called
     }
 
-    "return NotificationStatus for temporary-failure status" in new SetUp {
+    "return TemporaryFailure for temporary-failure status" in new SetUp {
       private val govUkNotificationStatus = buildGovNotifyResponseWithStatus("temporary-failure")
       private val httpResponse = HttpResponse(Status.OK, Json.toJson(govUkNotificationStatus), Map.empty[String, Seq[String]])
       mockGovUkConnector.notificationStatus(notificationId)
-        .returns(Future.successful(Right(httpResponse)))
+        .returns(Future.successful(httpResponse))
 
-      private val result = service.status(notificationId)
+      private val result = await(service.status(notificationId))
 
-      status(result) shouldBe OK
-      (contentAsJson(result) \ "notificationStatus").as[String] shouldBe "TEMPORARY_FAILURE"
-      (contentAsJson(result) \ "message").as[String] shouldBe
-        "Message was unable to be delivered by the network provider"
+      result shouldBe Right(TemporaryFailure)
 
       mockGovNotifyUtils.extractPasscodeFromGovNotifyBody(expectedGovNotifyResponseBody) was called
-      private val expectedAuditEvent = VerificationDeliveryResultRequestAuditEvent(expectedEmail, passcode, notificationId, "temporary-failure")
+      private val expectedAuditEvent = VerificationDeliveryResultRequestAuditEvent(expectedEmail, passcode,
+        notificationId, "temporary-failure")
       mockAuditService.sendExplicitAuditEvent(EmailVerificationDeliveryResultRequest, expectedAuditEvent) was called
     }
 
-    "return NotificationStatus for technical-failure status" in new SetUp {
+    "return TechnicalFailure for technical-failure status" in new SetUp {
       private val govUkNotificationStatus = buildGovNotifyResponseWithStatus("technical-failure")
-      private val httpResponse = HttpResponse(Status.OK, Json.toJson(govUkNotificationStatus), Map.empty[String, Seq[String]])
+      private val httpResponse = HttpResponse(Status.OK, Json.toJson(govUkNotificationStatus),
+        Map.empty[String, Seq[String]])
       mockGovUkConnector.notificationStatus(notificationId)
-        .returns(Future.successful(Right(httpResponse)))
+        .returns(Future.successful(httpResponse))
 
-      private val result = service.status(notificationId)
+      private val result = await(service.status(notificationId))
 
-      status(result) shouldBe OK
-      (contentAsJson(result) \ "notificationStatus").as[String] shouldBe "TECHNICAL_FAILURE"
-      (contentAsJson(result) \ "message").as[String] shouldBe "There is a problem with the notification vendor"
+      result shouldBe Right(TechnicalFailure)
 
       mockGovNotifyUtils.extractPasscodeFromGovNotifyBody(expectedGovNotifyResponseBody) was called
-      private val expectedAuditEvent = VerificationDeliveryResultRequestAuditEvent(expectedEmail, passcode, notificationId, "technical-failure")
+      private val expectedAuditEvent = VerificationDeliveryResultRequestAuditEvent(expectedEmail, passcode,
+        notificationId, "technical-failure")
       mockAuditService.sendExplicitAuditEvent(EmailVerificationDeliveryResultRequest, expectedAuditEvent) was called
     }
 
-    "return NotificationStatus when notification id not found" in new SetUp {
-      private val httpResponse = UpstreamErrorResponse("", Status.NOT_FOUND)
+    "return NotFound when notification id not found" in new SetUp {
+      private val httpResponse = HttpResponse(Status.NOT_FOUND, "")
       mockGovUkConnector.notificationStatus(notificationId)
-        .returns(Future.successful(Left(httpResponse)))
+        .returns(Future.successful(httpResponse))
 
-      private val result = service.status(notificationId)
+      private val result = await(service.status(notificationId))
 
-      status(result) shouldBe NOT_FOUND
-      (contentAsJson(result) \ "code").as[Int] shouldBe Codes.NOTIFICATION_NOT_FOUND.id
-      (contentAsJson(result) \ "message").as[String] shouldBe Messages.NOTIFICATION_ID_NOT_FOUND
+      result shouldBe Left(NotFound)
 
       mockGovNotifyUtils wasNever called
-      private val expectedAuditEvent = VerificationDeliveryResultRequestAuditEvent("No_data_found", "No_data_found", notificationId, "No_data_found")
+      private val expectedAuditEvent = VerificationDeliveryResultRequestAuditEvent("No_data_found", "No_data_found",
+        notificationId, "No_data_found")
       mockAuditService.sendExplicitAuditEvent(EmailVerificationDeliveryResultRequest, expectedAuditEvent) was called
     }
 
     "return ErrorResponse when notification id is not valid uuid" in new SetUp {
-      private val httpResponse = UpstreamErrorResponse("", Status.BAD_REQUEST)
+      private val httpResponse = HttpResponse(Status.BAD_REQUEST, "")
       mockGovUkConnector.notificationStatus(notificationId)
-        .returns(Future.successful(Left(httpResponse)))
+        .returns(Future.successful(httpResponse))
 
-      private val result = service.status(notificationId)
+      private val result = await(service.status(notificationId))
 
-      status(result) shouldBe BAD_REQUEST
-      (contentAsJson(result) \ "code").as[Int] shouldBe Codes.VALIDATION_ERROR.id
-      (contentAsJson(result) \ "message").as[String] shouldBe Messages.NOTIFICATION_ID_VALIDATION
+      result shouldBe Left(ValidationError)
     }
 
     "return ErrorResponse when gov uk notify returns 403" in new SetUp {
-      private val httpResponse = UpstreamErrorResponse("", Status.FORBIDDEN)
+      private val httpResponse = HttpResponse(Status.FORBIDDEN, "")
       mockGovUkConnector.notificationStatus(notificationId)
-        .returns(Future.successful(Left(httpResponse)))
+        .returns(Future.successful(httpResponse))
 
-      private val result = service.status(notificationId)
+      private val result = await(service.status(notificationId))
 
-      status(result) shouldBe SERVICE_UNAVAILABLE
-      (contentAsJson(result) \ "code").as[Int] shouldBe Codes.EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE.id
-      (contentAsJson(result) \ "message").as[String] shouldBe Messages.EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE
+      result shouldBe Left(GovNotifyForbidden)
     }
 
     "return Gateway timeout if gov-notify connection times-out" in new SetUp {
       mockGovUkConnector.notificationStatus(notificationId)
         .returns(Future.failed(new ConnectionException("")))
 
-      private val result = service.status(notificationId)
+      private val result = await(service.status(notificationId))
 
-      status(result) shouldBe GATEWAY_TIMEOUT
-      (contentAsJson(result) \ "code").as[Int] shouldBe Codes.EXTERNAL_SERVICE_TIMEOUT.id
-      (contentAsJson(result) \ "message").as[String] shouldBe Messages.EXTERNAL_SERVER_TIMEOUT
+      result shouldBe Left(GovNotifyServiceDown)
     }
   }
 

@@ -61,9 +61,8 @@ class VerifyIntegrationSpec extends AnyWordSpec
           .futureValue
 
       response.status shouldBe 400
-      (response.json \ "code").as[Int] shouldBe VALIDATION_ERROR.id
+      (response.json \ "code").as[Int] shouldBe VALIDATION_ERROR
       (response.json \ "message").as[String] shouldBe "Enter a valid email"
     }
   }
 }
-
