@@ -19,20 +19,22 @@ package uk.gov.hmrc.cipemailverification.controllers
 import play.api.Logging
 import play.api.libs.json._
 import play.api.mvc.{Action, ControllerComponents, Request, Result}
+import uk.gov.hmrc.cipemailverification.controllers.InternalAuthAccess.permission
 import uk.gov.hmrc.cipemailverification.models.api.{EmailAndPasscode, ErrorResponse}
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.VALIDATION_ERROR
 import uk.gov.hmrc.cipemailverification.services.VerifyService
+import uk.gov.hmrc.internalauth.client.BackendAuthComponents
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.Future
 
 @Singleton()
-class PasscodeController @Inject()(cc: ControllerComponents, service: VerifyService)
+class PasscodeController @Inject()(cc: ControllerComponents, service: VerifyService, auth: BackendAuthComponents)
   extends BackendController(cc)
     with Logging {
 
-  def verifyPasscode: Action[JsValue] = Action(parse.json).async { implicit request =>
+  def verifyPasscode: Action[JsValue] = auth.authorizedAction[Unit](permission).compose(Action(parse.json)).async { implicit request =>
     withJsonBody[EmailAndPasscode] {
       service.verifyPasscode
     }

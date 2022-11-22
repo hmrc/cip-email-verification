@@ -28,7 +28,11 @@ import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.cipemailverification.models.api.Email
 import uk.gov.hmrc.cipemailverification.services.VerifyService
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.internalauth.client.Predicate.Permission
+import uk.gov.hmrc.internalauth.client.test.{BackendAuthComponentsStub, StubBehaviour}
+import uk.gov.hmrc.internalauth.client._
 
+import scala.concurrent.ExecutionContext.Implicits
 import scala.concurrent.Future
 
 class VerifyControllerSpec
@@ -36,13 +40,8 @@ class VerifyControllerSpec
     with Matchers
     with IdiomaticMockito {
 
-  private implicit val writes: OWrites[Email] = Json.writes[Email]
-  private val fakeRequest = FakeRequest()
-  private val mockVerifyService = mock[VerifyService]
-  private val controller = new VerifyController(Helpers.stubControllerComponents(), mockVerifyService)
-
   "verify" should {
-    "delegate to verify service" in {
+    "delegate to verify service" in new SetUp {
       val email = Email("test@test.test")
       mockVerifyService.verifyEmail(email)(any[HeaderCarrier])
         .returns(Future.successful(Ok))
@@ -51,5 +50,20 @@ class VerifyControllerSpec
       )
       status(result) shouldBe OK
     }
+  }
+
+  trait SetUp {
+
+    protected implicit val writes: OWrites[Email] = Json.writes[Email]
+    protected val fakeRequest = FakeRequest().withHeaders("Authorization" -> "fake-token")
+    protected val mockVerifyService = mock[VerifyService]
+
+    val expectedPredicate = {
+      Permission(Resource(ResourceType("cip-email-verification"), ResourceLocation("*")), IAAction("*"))
+    }
+    protected val mockStubBehaviour = mock[StubBehaviour]
+    mockStubBehaviour.stubAuth(Some(expectedPredicate), Retrieval.EmptyRetrieval).returns(Future.unit)
+    protected val backendAuthComponentsStub = BackendAuthComponentsStub(mockStubBehaviour)(Helpers.stubControllerComponents(), Implicits.global)
+    protected val controller = new VerifyController(Helpers.stubControllerComponents(), mockVerifyService, backendAuthComponentsStub)
   }
 }

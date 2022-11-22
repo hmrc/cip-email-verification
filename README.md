@@ -49,18 +49,18 @@ For reference here are the details for running each of the services individually
 
 #### Verify
 
-    -XPOST -H "Content-type: application/json" -d '{
+    -XPOST -H "Content-type: application/json" -H "Authorization: TY8wpfCH-cyTL8mBiAsoPlbMW5eNYcdONHb0wNCWxlkP18UJoiIqBtbWbXCzgnlKWylcODd5y" -d '{
 	    "email": "<email>"
     }' 'https://cip-email-verification.protected.mdtp/customer-insight-platform/email/verify'
 
 #### Check notification status
 
-    -XGET -H "Content-type: application/json"
+    -XGET -H "Content-type: application/json"-H "Authorization: TY8wpfCH-cyTL8mBiAsoPlbMW5eNYcdONHb0wNCWxlkP18UJoiIqBtbWbXCzgnlKWylcODd5y"
     'https://cip-email-verification.protected.mdtp/customer-insight-platform/email/notifications/<notificationId>'
 
 #### Verify OTP
 
-    -XPOST -H "Content-type: application/json" -d '{
+    -XPOST -H "Content-type: application/json" -H "Authorization: TY8wpfCH-cyTL8mBiAsoPlbMW5eNYcdONHb0wNCWxlkP18UJoiIqBtbWbXCzgnlKWylcODd5y" -d '{
 	    "email": "<email>",
         "otp": "<otp>"
     }' 'https://cip-email-verification.protected.mdtp/customer-insight-platform/email/verify/otp'
