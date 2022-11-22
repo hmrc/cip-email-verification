@@ -21,6 +21,7 @@ import play.api.mvc.Result
 import play.api.mvc.Results._
 import uk.gov.hmrc.cipemailverification.config.AppConfig
 import uk.gov.hmrc.cipemailverification.connectors.{GovUkConnector, ValidateConnector}
+import uk.gov.hmrc.cipemailverification.metrics.MetricsService
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages._
 import uk.gov.hmrc.cipemailverification.models.api.{Email, EmailAndPasscode, ErrorResponse}
@@ -35,16 +36,19 @@ class VerifyService @Inject()(passcodeGenerator: PasscodeGenerator,
                               auditService: AuditService,
                               passcodeService: PasscodeService,
                               dateTimeUtils: DateTimeUtils,
+                              metricsService: MetricsService,
                               govUkConnector: GovUkConnector,
                               validateConnector: ValidateConnector,
                               config: AppConfig)
                              (implicit val executionContext: ExecutionContext) extends VerifyHelper(passcodeGenerator,
-  auditService, passcodeService, govUkConnector, dateTimeUtils, config) {
+  auditService, passcodeService, metricsService, govUkConnector, dateTimeUtils, config) {
 
   def verifyEmail(email: Email)(implicit hc: HeaderCarrier): Future[Result] =
     validateConnector.callService(email.email) transformWith {
       case Success(httpResponse) => processResponse(httpResponse, email)
       case Failure(error) =>
+        metricsService.recordMetric("CIP-Validation-HTTP-Failure")
+        metricsService.recordMetric(error.toString.trim.dropRight(1))
         logger.error(error.getMessage)
         Future.successful(ServiceUnavailable(Json.toJson(ErrorResponse(Codes.SERVER_CURRENTLY_UNAVAILABLE.id, SERVER_CURRENTLY_UNAVAILABLE))))
     }
@@ -53,6 +57,8 @@ class VerifyService @Inject()(passcodeGenerator: PasscodeGenerator,
     validateConnector.callService(emailAndPasscode.email).transformWith {
       case Success(httpResponse) => processResponseForPasscode(httpResponse, emailAndPasscode)
       case Failure(error) =>
+        metricsService.recordMetric("CIP-Validation-HTTP-Failure")
+        metricsService.recordMetric(error.toString.trim.dropRight(1))
         logger.error(error.getMessage)
         Future.successful(ServiceUnavailable(Json.toJson(ErrorResponse(Codes.SERVER_CURRENTLY_UNAVAILABLE.id, SERVER_CURRENTLY_UNAVAILABLE))))
     }
