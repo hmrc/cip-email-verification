@@ -29,7 +29,11 @@ import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.VALIDATIO
 import uk.gov.hmrc.cipemailverification.models.api.{EmailAndPasscode, VerificationStatus}
 import uk.gov.hmrc.cipemailverification.services.VerifyService
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.internalauth.client.Predicate.Permission
+import uk.gov.hmrc.internalauth.client._
+import uk.gov.hmrc.internalauth.client.test.{BackendAuthComponentsStub, StubBehaviour}
 
+import scala.concurrent.ExecutionContext.Implicits
 import scala.concurrent.Future
 
 class PasscodeControllerSpec
@@ -37,13 +41,8 @@ class PasscodeControllerSpec
     with Matchers
     with IdiomaticMockito {
 
-  private implicit val writes: OWrites[EmailAndPasscode] = Json.writes[EmailAndPasscode]
-  private val fakeRequest = FakeRequest()
-  private val mockVerifyService = mock[VerifyService]
-  private val controller = new PasscodeController(Helpers.stubControllerComponents(), mockVerifyService)
-
   "verifyPasscode" should {
-    "delegate to verify service" in {
+    "delegate to verify service" in new SetUp {
       val passcode = EmailAndPasscode("07123456789", "123456")
       mockVerifyService.verifyPasscode(passcode)(any[HeaderCarrier])
         .returns(Future.successful(Ok(Json.toJson(VerificationStatus("test")))))
@@ -54,7 +53,7 @@ class PasscodeControllerSpec
       (contentAsJson(result) \ "status").as[String] shouldBe "test"
     }
 
-    "return 400 for invalid request" in {
+    "return 400 for invalid request" in new SetUp {
       val result = controller.verifyPasscode(
         fakeRequest.withBody(Json.toJson(EmailAndPasscode("", "test")))
       )
@@ -62,5 +61,21 @@ class PasscodeControllerSpec
       (contentAsJson(result) \ "code").as[Int] shouldBe VALIDATION_ERROR.id
       (contentAsJson(result) \ "message").as[String] shouldBe "Enter a valid passcode"
     }
+  }
+
+  trait SetUp {
+
+    protected implicit val writes: OWrites[EmailAndPasscode] = Json.writes[EmailAndPasscode]
+    protected val fakeRequest = FakeRequest().withHeaders("Authorization" -> "fake-token")
+    protected val mockVerifyService = mock[VerifyService]
+
+    val expectedPredicate = {
+      Permission(Resource(ResourceType("cip-email-verification"), ResourceLocation("*")), IAAction("*"))
+    }
+    protected val mockStubBehaviour = mock[StubBehaviour]
+    mockStubBehaviour.stubAuth(Some(expectedPredicate), Retrieval.EmptyRetrieval).returns(Future.unit)
+    protected val backendAuthComponentsStub = BackendAuthComponentsStub(mockStubBehaviour)(Helpers.stubControllerComponents(), Implicits.global)
+    protected val controller = new PasscodeController(Helpers.stubControllerComponents(), mockVerifyService, backendAuthComponentsStub)
+
   }
 }

@@ -39,6 +39,7 @@ class VerifyIntegrationSpec extends AnyWordSpec
       val response =
         wsClient
           .url(s"$baseUrl/customer-insight-platform/email/verify")
+          .withHttpHeaders(("Authorization", "fake-token"))
           .withRequestFilter(AhcCurlRequestLogger())
           .post(Json.parse {
             """{"email": "test@test.com"}""".stripMargin
@@ -52,6 +53,7 @@ class VerifyIntegrationSpec extends AnyWordSpec
       val response =
         wsClient
           .url(s"$baseUrl/customer-insight-platform/email/verify")
+          .withHttpHeaders(("Authorization", "fake-token"))
           .withRequestFilter(AhcCurlRequestLogger())
           .post(Json.parse {
             s"""{"email": ""}""".stripMargin

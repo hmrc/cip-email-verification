@@ -40,6 +40,7 @@ trait DataSteps {
   def verify(email: String): Future[WSResponse] = {
     wsClient
       .url(s"$baseUrl/customer-insight-platform/email/verify")
+      .withHttpHeaders(("Authorization", "fake-token"))
       .post(Json.parse {
         s"""{"email": "$email"}""".stripMargin
       })

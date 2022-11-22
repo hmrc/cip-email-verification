@@ -1,6 +1,7 @@
 ### Correct-email
 POST http://localhost:6183/customer-insight-platform/email/verify
 content-type: application/json
+Authorization: fake-token
 
 {
   "email" : "test1@test.com"
@@ -9,6 +10,7 @@ content-type: application/json
 ### Badrequest
 POST http://localhost:6183/customer-insight-platform/email/verify
 content-type: application/json
+Authorization: fake-token
 
 {
   "email" : "teamonly@something.com"
@@ -17,6 +19,7 @@ content-type: application/json
 ### Forbidden
 POST http://localhost:6183/customer-insight-platform/email/verify
 content-type: application/json
+Authorization: fake-token
 
 {
   "email" : "systemclock@something.com"
@@ -25,6 +28,7 @@ content-type: application/json
 ### Too many request
 POST http://localhost:6183/customer-insight-platform/email/verify
 content-type: application/json
+Authorization: fake-token
 
 {
   "email" : "ratelimit@something.com"
@@ -33,6 +37,7 @@ content-type: application/json
 ### InternalServerError
 POST http://localhost:6183/customer-insight-platform/email/verify
 content-type: application/json
+Authorization: fake-token
 
 {
   "email" : "exception@something.com"
@@ -42,6 +47,7 @@ content-type: application/json
 ### Trial Mode - expecting `"code": 1004`
 POST http://localhost:6183/customer-insight-platform/email/verify
 content-type: application/json
+Authorization: fake-token
 
 {
   "email" : "trialmode@something.com"
@@ -50,6 +56,7 @@ content-type: application/json
 ###
 POST http://localhost:6183/customer-insight-platform/email/verify/passcode
 content-type: application/json
+Authorization: fake-token
 
 {
   "email" : "test1@test.com",

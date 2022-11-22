@@ -17,16 +17,18 @@
 package uk.gov.hmrc.cipemailverification.controllers
 
 import play.api.mvc.{Action, AnyContent, ControllerComponents}
+import uk.gov.hmrc.cipemailverification.controllers.InternalAuthAccess.permission
 import uk.gov.hmrc.cipemailverification.services.NotificationService
+import uk.gov.hmrc.internalauth.client.BackendAuthComponents
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
 import javax.inject.{Inject, Singleton}
 
 @Singleton()
-class NotificationController @Inject()(cc: ControllerComponents, notificationsService: NotificationService)
+class NotificationController @Inject()(cc: ControllerComponents, notificationsService: NotificationService, auth: BackendAuthComponents)
   extends BackendController(cc) {
 
-  def status(notificationId: String): Action[AnyContent] = Action.async { implicit request =>
+  def status(notificationId: String): Action[AnyContent] = auth.authorizedAction[Unit](permission).compose(Action).async { implicit request =>
     notificationsService.status(notificationId)
   }
 }
