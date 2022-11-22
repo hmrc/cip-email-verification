@@ -24,6 +24,7 @@ import play.api.mvc.Results.{Accepted, BadGateway, BadRequest, InternalServerErr
 import play.api.mvc.{ResponseHeader, Result}
 import uk.gov.hmrc.cipemailverification.config.AppConfig
 import uk.gov.hmrc.cipemailverification.connectors.GovUkConnector
+import uk.gov.hmrc.cipemailverification.metrics.MetricsService
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages._
 import uk.gov.hmrc.cipemailverification.models.api.StatusMessage.{NOT_VERIFIED, VERIFIED}
@@ -45,6 +46,7 @@ import scala.util.{Failure, Success}
 abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
                                       auditService: AuditService,
                                       passcodeService: PasscodeService,
+                                      metricsService: MetricsService,
                                       govUkConnector: GovUkConnector,
                                       dateTimeUtils: DateTimeUtils,
                                       config: AppConfig)
@@ -70,6 +72,7 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
     passcodeService.persistPasscode(dataToSave) transformWith {
       case Success(savedEmailPasscodeData) => sendPasscode(savedEmailPasscodeData)
       case Failure(err) =>
+        metricsService.recordMetric("mongo_cache_failure")
         logger.error(s"Database operation failed, ${err.getMessage}")
         Future.successful(InternalServerError(Json.toJson(ErrorResponse(Codes.PASSCODE_PERSISTING_FAIL.id, SERVER_EXPERIENCED_AN_ISSUE))))
     }
@@ -91,6 +94,7 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
       result <- processPasscode(EmailAndPasscode(validatedEmail.email, passcode), maybeEmailAndPasscodeData)
     } yield result).recover {
       case err =>
+        metricsService.recordMetric("mongo_cache_failure")
         logger.error(s"Database operation failed - ${err.getMessage}")
         InternalServerError(Json.toJson(ErrorResponse(Codes.PASSCODE_CHECK_FAIL.id, SERVER_EXPERIENCED_AN_ISSUE))) //Done
     }
@@ -111,6 +115,7 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
                                                     foundEmailPasscodeData: EmailAndPasscodeData, now: Long)
                                                    (implicit hc: HeaderCarrier): Future[Result] = {
     if (hasPasscodeExpired(foundEmailPasscodeData: EmailAndPasscodeData, now)) {
+      metricsService.recordMetric("passcode_verification_success")
       auditService.sendExplicitAuditEvent(EmailVerificationCheck,
         VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, NOT_VERIFIED, Some("Passcode expired")))
       Future.successful(Ok(Json.toJson(
@@ -154,26 +159,34 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
                           (implicit hc: HeaderCarrier) = govUkConnector.sendPasscode(data) map {
     case Left(error) => error.statusCode match {
       case INTERNAL_SERVER_ERROR =>
+        metricsService.recordMetric(s"UpstreamErrorResponse.${error.statusCode}")
         logger.error(error.getMessage)
         BadGateway(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_ERROR.id, EXTERNAL_SERVER_EXPERIENCED_AN_ISSUE)))
       case BAD_REQUEST =>
+        metricsService.recordMetric(s"UpstreamErrorResponse.${error.statusCode}")
         logger.error(error.getMessage)
         ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_FAIL_VALIDATION.id, SERVER_EXPERIENCED_AN_ISSUE)))
       case FORBIDDEN =>
+        metricsService.recordMetric(s"UpstreamErrorResponse.${error.statusCode}")
         logger.error(error.getMessage)
         ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_FAIL_FORBIDDEN.id, SERVER_EXPERIENCED_AN_ISSUE)))
       case TOO_MANY_REQUESTS =>
+        metricsService.recordMetric(s"UpstreamErrorResponse.${error.statusCode}")
         logger.error(error.getMessage)
         TooManyRequests(Json.toJson(ErrorResponse(Codes.MESSAGE_THROTTLED_OUT.id, THROTTLED_TOO_MANY_REQUESTS)))
       case _ =>
+        metricsService.recordMetric(s"UpstreamErrorResponse.${error.statusCode}")
         logger.error(error.getMessage)
         Result.apply(ResponseHeader(error.statusCode), HttpEntity.NoEntity)
     }
     case Right(response) if response.status == 201 =>
+      metricsService.recordMetric("gov-notify_call_success")
       Accepted.withHeaders(("Location", s"/notifications/${response.json.as[GovUkNotificationId].id}"))
   } recover {
     case err =>
       logger.error(err.getMessage)
+      metricsService.recordMetric(err.toString.trim.dropRight(1))
+      metricsService.recordMetric("gov-notify_connection_failure")
       ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE.id, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
   }
 }

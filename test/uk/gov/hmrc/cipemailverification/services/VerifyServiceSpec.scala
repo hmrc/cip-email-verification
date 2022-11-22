@@ -27,6 +27,7 @@ import play.api.libs.json.{Json, OWrites}
 import play.api.test.Helpers.{contentAsJson, contentAsString, defaultAwaitTimeout, status}
 import uk.gov.hmrc.cipemailverification.config.AppConfig
 import uk.gov.hmrc.cipemailverification.connectors.{GovUkConnector, ValidateConnector}
+import uk.gov.hmrc.cipemailverification.metrics.MetricsService
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{PASSCODE_CHECK_FAIL, PASSCODE_ENTERED_EXPIRED, PASSCODE_ENTERED_EXPIRED_CACHE, SERVER_CURRENTLY_UNAVAILABLE}
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.{Codes, Messages}
 import uk.gov.hmrc.cipemailverification.models.api.{Email, EmailAndPasscode}
@@ -425,6 +426,7 @@ class VerifyServiceSpec extends AnyWordSpec
     protected val govUkConnectorMock: GovUkConnector = mock[GovUkConnector]
     protected val auditServiceMock: AuditService = mock[AuditService]
     protected val passcodeGeneratorMock: PasscodeGenerator = mock[PasscodeGenerator]
+    protected val mockMetricsService: MetricsService = mock[MetricsService]
     private val dateTimeUtilsMock: DateTimeUtils = mock[DateTimeUtils]
     protected val passcode = "ABCDEF"
     passcodeGeneratorMock.passcodeGenerator().returns(passcode)
@@ -443,6 +445,7 @@ class VerifyServiceSpec extends AnyWordSpec
       auditServiceMock,
       passcodeServiceMock,
       dateTimeUtilsMock,
+      mockMetricsService,
       govUkConnectorMock,
       validateConnectorMock,
       appConfig)
