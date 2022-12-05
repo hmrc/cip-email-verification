@@ -18,7 +18,7 @@ package uk.gov.hmrc.cipemailverification.models.api
 
 import play.api.libs.functional.syntax.{toApplicativeOps, toFunctionalBuilderOps}
 import play.api.libs.json.Reads.{maxLength, minLength}
-import play.api.libs.json.{JsPath, Json, Reads, Writes}
+import play.api.libs.json.{JsPath, Reads}
 
 case class EmailAndPasscode(email: String, passcode: String)
 
@@ -30,6 +30,4 @@ object EmailAndPasscode {
     (JsPath \ "email").read[String] and
       (JsPath \ "passcode").read[String](minLength[String](MIN_LENGTH_PASSCODE).keepAnd(maxLength[String](MAX_LENGTH_PASSCODE)))
     ) (EmailAndPasscode.apply _)
-
-  implicit val writes: Writes[EmailAndPasscode] = Json.writes[EmailAndPasscode]
 }

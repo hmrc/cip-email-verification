@@ -21,7 +21,6 @@ import play.api.{ConfigLoader, Configuration}
 import scala.concurrent.duration.FiniteDuration
 
 object CircuitBreakerConfig {
-
   implicit lazy val configLoader: ConfigLoader[CircuitBreakerConfig] = ConfigLoader {
     rootConfig =>
       rootPath =>

@@ -24,7 +24,9 @@ import javax.inject.Inject
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationLong
 
-class PasscodeCacheRepository @Inject()(mongoComponent: MongoComponent, config: AppConfig, timestampSupport: TimestampSupport)(implicit ec: ExecutionContext)
+class PasscodeCacheRepository @Inject()(mongoComponent: MongoComponent, config: AppConfig,
+                                        timestampSupport: TimestampSupport)
+                                       (implicit ec: ExecutionContext)
   extends MongoCacheRepository(
     mongoComponent = mongoComponent,
     collectionName = "cip-email-verification",

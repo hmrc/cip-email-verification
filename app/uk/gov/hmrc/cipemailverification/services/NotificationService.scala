@@ -17,78 +17,76 @@
 package uk.gov.hmrc.cipemailverification.services
 
 import play.api.Logging
-import play.api.http.HttpEntity
 import play.api.http.Status._
-import play.api.libs.json.Json
-import play.api.mvc.Results._
-import play.api.mvc.{ResponseHeader, Result}
 import uk.gov.hmrc.cipemailverification.connectors.GovUkConnector
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.{Codes, Messages}
-import uk.gov.hmrc.cipemailverification.models.api.{ErrorResponse, NotificationStatus}
 import uk.gov.hmrc.cipemailverification.models.domain.audit.AuditType.EmailVerificationDeliveryResultRequest
 import uk.gov.hmrc.cipemailverification.models.domain.audit.VerificationDeliveryResultRequestAuditEvent
+import uk.gov.hmrc.cipemailverification.models.domain.result._
 import uk.gov.hmrc.cipemailverification.models.http.govnotify.GovUkNotificationStatusResponse
 import uk.gov.hmrc.cipemailverification.utils.GovNotifyUtils
-import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse, UpstreamErrorResponse}
+import uk.gov.hmrc.http.HttpReads.is2xx
+import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse}
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 @Singleton()
-class NotificationService @Inject()(govNotifyUtils: GovNotifyUtils, auditService: AuditService, govUkConnector: GovUkConnector)
+class NotificationService @Inject()(govNotifyUtils: GovNotifyUtils, auditService: AuditService,
+                                    govUkConnector: GovUkConnector)
                                    (implicit val executionContext: ExecutionContext) extends Logging {
 
   private val NO_DATA_FOUND = "No_data_found"
 
-  def status(notificationId: String)(implicit hc: HeaderCarrier): Future[Result] = {
+  def status(notificationId: String)(implicit hc: HeaderCarrier): Future[Either[ApplicationError, NotificationStatusResult]] = {
     def success(response: HttpResponse) = {
-
       val govNotifyResponse: GovUkNotificationStatusResponse = response.json.as[GovUkNotificationStatusResponse]
       val email = govNotifyResponse.email_address
       val passcode = govNotifyUtils.extractPasscodeFromGovNotifyBody(govNotifyResponse.body)
       val deliveryStatus = govNotifyResponse.status
-      val (notificationStatus, message) = deliveryStatus match {
-        case "created" => ("CREATED", "Message is in the process of being sent")
-        case "sending" => ("SENDING", "Message has been sent")
-        case "pending" => ("PENDING", "Message is in the process of being delivered")
-        case "sent" => ("SENT", "Message was sent successfully")
-        case "delivered" => ("DELIVERED", "Message was delivered successfully")
-        case "permanent-failure" => ("PERMANENT_FAILURE", "Message was unable to be delivered by the network provider")
-        case "temporary-failure" => ("TEMPORARY_FAILURE", "Message was unable to be delivered by the network provider")
-        case "technical-failure" => ("TECHNICAL_FAILURE", "There is a problem with the notification vendor")
+      val result = deliveryStatus match {
+        case "created" => Created
+        case "sending" => Sending
+        case "pending" => Pending
+        case "sent" => Sent
+        case "delivered" => Delivered
+        case "permanent-failure" => PermanentFailure
+        case "temporary-failure" => TemporaryFailure
+        case "technical-failure" => TechnicalFailure
       }
       auditService.sendExplicitAuditEvent(EmailVerificationDeliveryResultRequest,
         VerificationDeliveryResultRequestAuditEvent(email, passcode, notificationId, deliveryStatus))
-      Ok(Json.toJson(NotificationStatus(notificationStatus, message)))
+
+      Right(result)
     }
 
-    def failure(err: UpstreamErrorResponse) = {
-      err.statusCode match {
+    def failure(err: HttpResponse) = {
+      err.status match {
         case NOT_FOUND =>
           logger.warn("Notification Id not found")
           auditService.sendExplicitAuditEvent(EmailVerificationDeliveryResultRequest,
             VerificationDeliveryResultRequestAuditEvent(NO_DATA_FOUND, NO_DATA_FOUND, notificationId, NO_DATA_FOUND))
-          NotFound(Json.toJson(ErrorResponse(Codes.NOTIFICATION_NOT_FOUND.id, Messages.NOTIFICATION_ID_NOT_FOUND)))
+          Left(NotFound)
         case BAD_REQUEST =>
           logger.warn("Notification Id not valid")
-          BadRequest(Json.toJson(ErrorResponse(Codes.VALIDATION_ERROR.id, Messages.NOTIFICATION_ID_VALIDATION)))
+          Left(ValidationError)
         case FORBIDDEN =>
-          logger.warn(err.message)
-          ServiceUnavailable(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE.id, Messages.EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
+          logger.warn(err.body)
+          Left(GovNotifyForbidden)
         case _ =>
-          logger.error(err.message)
-          Result.apply(ResponseHeader(err.statusCode), HttpEntity.NoEntity)
+          logger.error(err.body)
+          Left(GovNotifyServerError)
       }
     }
 
-    govUkConnector.notificationStatus(notificationId).map {
-      case Right(response) =>
-        success(response)
-      case Left(err) => failure(err)
-    } recover {
-      case err =>
-        logger.error(err.getMessage)
-        GatewayTimeout(Json.toJson(ErrorResponse(Codes.EXTERNAL_SERVICE_TIMEOUT.id, Messages.EXTERNAL_SERVER_TIMEOUT)))
+    govUkConnector.notificationStatus(notificationId) transformWith {
+      case Success(response) => response match {
+        case _ if is2xx(response.status) => Future.successful(success(response))
+        case _ => Future.successful(failure(response))
+      }
+      case Failure(response) =>
+        logger.error(response.getMessage)
+        Future.successful(Left(GovNotifyServiceDown))
     }
   }
 }

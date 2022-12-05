@@ -33,14 +33,15 @@ trait CircuitBreakerWrapper extends Logging {
   def withCircuitBreaker[T](block: => Future[T])(implicit connectionFailure: Try[T] => Boolean): Future[T] =
     circuitBreaker.withCircuitBreaker(block, connectionFailure)
 
-  lazy val circuitBreaker = new CircuitBreaker(
+  lazy val circuitBreaker: CircuitBreaker = new CircuitBreaker(
     scheduler = materializer.system.scheduler,
     maxFailures = configCB.maxFailures, // Maximum number of failures before opening the circuit
     callTimeout = configCB.callTimeout, // time after which to consider a call a failure
     resetTimeout = configCB.resetTimeout, // time after which to attempt to close the circuit
     maxResetTimeout = configCB.maxResetTimeout, // max time after which to attempt to close the circuit
     exponentialBackoffFactor = configCB.exponentialBackoffFactor, // exponential time gap e.g. 1 1.2 1.2+1.2*0.2
-    randomFactor = configCB.randomFactor //after calculation of the exponential back-off an additional random delay based on this factor is added, e.g. 0.2 adds up to 20% delay.
+    randomFactor = configCB.randomFactor //after calculation of the exponential back-off an additional random delay
+    // based on this factor is added, e.g. 0.2 adds up to 20% delay.
   )(materializer.executionContext)
     .onOpen(logger.warn(s"Circuit breaker for ${configCB.serviceName} opened and will not close for ${configCB.resetTimeout}")) //Scenario 1
     .onHalfOpen(logger.warn(s"Circuit breaker for ${configCB.serviceName} is half open")) //Scenario 2

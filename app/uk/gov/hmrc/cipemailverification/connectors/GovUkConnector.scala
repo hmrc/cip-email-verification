@@ -26,7 +26,7 @@ import uk.gov.hmrc.cipemailverification.config.{AppConfig, CircuitBreakerConfig}
 import uk.gov.hmrc.cipemailverification.models.domain.data.EmailAndPasscodeData
 import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.client.HttpClientV2
-import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse, StringContextOps, UpstreamErrorResponse}
+import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse, StringContextOps}
 
 import java.nio.charset.StandardCharsets
 import java.util.Date
@@ -39,22 +39,22 @@ class GovUkConnector @Inject()(httpClient: HttpClientV2, config: AppConfig)
                               (implicit executionContext: ExecutionContext, protected val materializer: Materializer)
   extends Logging with CircuitBreakerWrapper {
 
-  implicit val connectionFailure: Try[Either[UpstreamErrorResponse, HttpResponse]] => Boolean = {
+  implicit val connectionFailure: Try[HttpResponse] => Boolean = {
     case Success(_) => false
     case Failure(_) => true
   }
 
-  def notificationStatus(notificationId: String)(implicit hc: HeaderCarrier): Future[Either[UpstreamErrorResponse, HttpResponse]] = {
-    withCircuitBreaker[Either[UpstreamErrorResponse, HttpResponse]](
+  def notificationStatus(notificationId: String)(implicit hc: HeaderCarrier): Future[HttpResponse] = {
+    withCircuitBreaker[HttpResponse](
       httpClient
         .get(url"${config.govNotifyConfig.host}/v2/notifications/$notificationId")
         .setHeader((s"Authorization", s"Bearer $jwtBearerToken"))
         .withProxy
-        .execute[Either[UpstreamErrorResponse, HttpResponse]]
+        .execute[HttpResponse]
     )
   }
 
-  def sendPasscode(emailPasscodeData: EmailAndPasscodeData)(implicit hc: HeaderCarrier): Future[Either[UpstreamErrorResponse, HttpResponse]] = {
+  def sendPasscode(emailPasscodeData: EmailAndPasscodeData)(implicit hc: HeaderCarrier): Future[HttpResponse] = {
     // TODO Build this elsewhere
     val passcodeRequest = Json.obj(
       "email_address" -> s"${emailPasscodeData.email}",
@@ -65,13 +65,13 @@ class GovUkConnector @Inject()(httpClient: HttpClientV2, config: AppConfig)
         "timeToLive" -> s"${config.passcodeExpiry}")
     )
 
-    withCircuitBreaker[Either[UpstreamErrorResponse, HttpResponse]](
+    withCircuitBreaker[HttpResponse](
       httpClient
         .post(url"${config.govNotifyConfig.host}/v2/notifications/email")
         .setHeader((s"Authorization", s"Bearer $jwtBearerToken"))
         .withBody(Json.toJson(passcodeRequest))
         .withProxy
-        .execute[Either[UpstreamErrorResponse, HttpResponse]]
+        .execute[HttpResponse]
     )
   }
 

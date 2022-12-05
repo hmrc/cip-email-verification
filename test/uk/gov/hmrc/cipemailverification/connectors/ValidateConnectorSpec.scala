@@ -68,7 +68,8 @@ class ValidateConnectorSpec extends AnyWordSpec
     protected val appConfigMock: AppConfig = mock[AppConfig]
     protected val cipValidationConfigMock: CipValidationConfig = mock[CipValidationConfig]
 
-    protected val cbConfigData: CircuitBreakerConfig = CircuitBreakerConfig("", 5, 5.minutes, 30.seconds, 5.minutes, 1, 0)
+    protected val cbConfigData: CircuitBreakerConfig =
+      CircuitBreakerConfig("", 5, 5.minutes, 30.seconds, 5.minutes, 1, 0)
 
     appConfigMock.validationConfig returns cipValidationConfigMock
     cipValidationConfigMock.cbConfig returns cbConfigData

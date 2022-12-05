@@ -14,12 +14,16 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.cipemailverification.models.domain.audit
+package uk.gov.hmrc.cipemailverification.models.domain.result
 
-import play.api.libs.json.{Json, OWrites}
+import uk.gov.hmrc.cipemailverification.models.http.govnotify.GovUkNotificationId
 
-case class VerificationRequestAuditEvent(email: String, passcode: String) extends AuditEvent(email, passcode)
+sealed trait VerifyResult
 
-object VerificationRequestAuditEvent {
-  implicit val writes: OWrites[VerificationRequestAuditEvent] = Json.writes[VerificationRequestAuditEvent]
-}
+case class PasscodeSent(notificationId: GovUkNotificationId) extends VerifyResult
+
+case object PasscodeExpired extends VerifyResult
+
+case object Verified extends VerifyResult
+
+case object NotVerified extends VerifyResult

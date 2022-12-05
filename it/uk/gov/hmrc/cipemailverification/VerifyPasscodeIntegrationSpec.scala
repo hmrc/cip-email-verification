@@ -26,7 +26,7 @@ import play.api.libs.ws.ahc.AhcCurlRequestLogger
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes
 import uk.gov.hmrc.cipemailverification.utils.DataSteps
 
-class PasscodeIntegrationSpec
+class VerifyPasscodeIntegrationSpec
   extends AnyWordSpec
     with Matchers
     with ScalaFutures
@@ -77,7 +77,7 @@ class PasscodeIntegrationSpec
           .futureValue
 
       response.status shouldBe 400
-      (response.json \ "code").as[Int] shouldBe Codes.VALIDATION_ERROR.id
+      (response.json \ "code").as[Int] shouldBe Codes.VALIDATION_ERROR
       (response.json \ "message").as[String] shouldBe "Enter a valid passcode"
     }
   }

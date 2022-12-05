@@ -17,12 +17,12 @@
 package uk.gov.hmrc.cipemailverification.connectors
 
 import akka.stream.Materializer
-import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, post, stubFor, urlEqualTo}
+import com.github.tomakehurst.wiremock.client.WireMock
+import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, stubFor, urlEqualTo}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import play.api.http.Status.OK
-import play.api.libs.json.Json
 import play.api.test.Helpers.{await, defaultAwaitTimeout}
 import uk.gov.hmrc.cipemailverification.config.CircuitBreakerConfig
 import uk.gov.hmrc.cipemailverification.utils.TestActorSystem
@@ -40,16 +40,15 @@ class CircuitBreakerWrapperSpec extends AnyWordSpec
   with HttpClientV2Support
   with TestActorSystem {
 
-  val verificationUrl: String = "/customer-insight-platform/email-address/verify"
+  val url: String = "/test-endpoint"
 
   "Circuit Breakers" should {
     "not be triggered when call is successful" in new SetUp {
-      stubFor(post(urlEqualTo(verificationUrl)).willReturn(aResponse()))
+      stubFor(WireMock.get(urlEqualTo(url)).willReturn(aResponse()))
 
       private val result = circuitBreakers.withCircuitBreaker(
         httpClientV2
-          .post(url"http://$wireMockHost:$wireMockPort/customer-insight-platform/email-address/verify")
-          .withBody(Json.obj("phoneNumber" -> "test"))
+          .get(url"http://$wireMockHost:$wireMockPort/test-endpoint")
           .execute[HttpResponse]
       )
 
@@ -63,7 +62,8 @@ class CircuitBreakerWrapperSpec extends AnyWordSpec
   trait SetUp {
     protected implicit val hc: HeaderCarrier = HeaderCarrier()
     protected val circuitBreakers: CircuitBreakerWrapper = new CircuitBreakerWrapper {
-      override def configCB: CircuitBreakerConfig = CircuitBreakerConfig("Cip Validation", 2, 60.seconds, 60.seconds, 60.seconds, 1, 0)
+      override def configCB: CircuitBreakerConfig =
+        CircuitBreakerConfig("test-config", 2, 60.seconds, 60.seconds, 60.seconds, 1, 0)
 
       override def materializer: Materializer = Materializer(TestActorSystem.system)
     }

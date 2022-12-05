@@ -14,14 +14,22 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.cipemailverification.models.domain.audit
+package uk.gov.hmrc.cipemailverification.models.domain.result
 
-import play.api.libs.json.{Json, OWrites}
+sealed trait NotificationStatusResult
 
-case class VerificationCheckAuditEvent(email: String, passcode: String, result: String, failureReason: Option[String] = None)
-  extends AuditEvent(email, passcode)
+case object Created extends NotificationStatusResult
 
-object VerificationCheckAuditEvent {
+case object Sending extends NotificationStatusResult
 
-  implicit val writes: OWrites[VerificationCheckAuditEvent] = Json.writes[VerificationCheckAuditEvent]
-}
+case object Pending extends NotificationStatusResult
+
+case object Sent extends NotificationStatusResult
+
+case object Delivered extends NotificationStatusResult
+
+case object PermanentFailure extends NotificationStatusResult
+
+case object TemporaryFailure extends NotificationStatusResult
+
+case object TechnicalFailure extends NotificationStatusResult

@@ -31,7 +31,8 @@ import scala.concurrent.ExecutionContext
 class AuditService @Inject()(auditConnector: AuditConnector
                             )(implicit ec: ExecutionContext) extends Logging {
 
-  def sendExplicitAuditEvent[T <: AuditEvent](auditType: Type, auditEvent: T)(implicit hc: HeaderCarrier, writes: Writes[T]): Unit = {
+  def sendExplicitAuditEvent[T <: AuditEvent](auditType: Type, auditEvent: T)
+                                             (implicit hc: HeaderCarrier, writes: Writes[T]): Unit = {
     logger.debug(s"Sending explicit audit event for $auditEvent")
     auditConnector.sendExplicitAudit(auditType.toString, auditEvent)
   }
