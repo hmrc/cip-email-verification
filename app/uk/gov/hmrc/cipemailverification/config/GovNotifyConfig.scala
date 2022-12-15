@@ -26,7 +26,7 @@ case class GovNotifyConfig(
                             govUkNotifyApiKeyIssUuid: String,
                             govUkNotifyApiKeySecretKeyUuid: String,
                             cbConfig: CircuitBreakerConfig
-                          ) {
+                          ){
   lazy val url: String = s"$protocol://$host:$port"
 }
 
