@@ -71,19 +71,28 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
       Future.successful(Left(ValidationServiceError))
   }
 
-  private def processValidEmailAddress(email: Email)(implicit hc: HeaderCarrier) = {
+  private def processValidEmailAddress(email: Email)(implicit hc: HeaderCarrier): Future[Either[ApplicationError, VerifyResult]] = {
     val passcode = passcodeGenerator.passcodeGenerator()
     val now = dateTimeUtils.getCurrentDateTime()
     val dataToSave = new EmailAndPasscodeData(email.email, passcode, now)
+
     auditService.sendExplicitAuditEvent(EmailVerificationRequest,
       VerificationRequestAuditEvent(dataToSave.email, passcode))
 
-    passcodeService.persistPasscode(dataToSave) transformWith {
-      case Success(savedEmailPasscodeData) => sendPasscode(savedEmailPasscodeData)
+    passcodeService.retrievePasscode(email.email) transformWith {
       case Failure(err) =>
         metricsService.recordMetric("mongo_cache_failure")
         logger.error(s"Database operation failed, ${err.getMessage}")
         Future.successful(Left(DatabaseServiceDown))
+      case Success(value) if value.isEmpty =>
+        passcodeService.persistPasscode(dataToSave) transformWith {
+          case Success(savedEmailPasscodeData) => sendPasscode(savedEmailPasscodeData)
+          case Failure(err) =>
+            metricsService.recordMetric("mongo_cache_failure")
+            logger.error(s"Database operation failed, ${err.getMessage}")
+            Future.successful(Left(DatabaseServiceDown))        }
+      case Success(value) if value.nonEmpty =>
+        Future.successful(Left(RequestInProgress))
     }
   }
 

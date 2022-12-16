@@ -25,6 +25,8 @@ import play.api.libs.ws.WSClient
 import play.api.libs.ws.ahc.AhcCurlRequestLogger
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.VALIDATION_ERROR
 
+import scala.util.Random
+
 class VerifyIntegrationSpec extends AnyWordSpec
   with Matchers
   with ScalaFutures
@@ -34,15 +36,17 @@ class VerifyIntegrationSpec extends AnyWordSpec
   private val wsClient = app.injector.instanceOf[WSClient]
   private val baseUrl = s"http://localhost:$port"
 
+  private val emailRandomizer = Random.alphanumeric.take(10).mkString
+
   "/verify" should {
-    "return 200 with valid email" in {
+    "return 202 with valid email" in {
       val response =
         wsClient
           .url(s"$baseUrl/customer-insight-platform/email/verify")
           .withHttpHeaders(("Authorization", "fake-token"))
           .withRequestFilter(AhcCurlRequestLogger())
           .post(Json.parse {
-            """{"email": "test@test.com"}""".stripMargin
+            s"""{"email": "$emailRandomizer@test.com"}""".stripMargin
           })
           .futureValue
 

@@ -17,6 +17,7 @@
 package uk.gov.hmrc.cipemailverification.utils
 import org.scalatestplus.play.guice.GuiceOneServerPerSuite
 import play.api.libs.json.Json
+import play.api.libs.ws.ahc.AhcCurlRequestLogger
 import play.api.libs.ws.{WSClient, WSResponse}
 import uk.gov.hmrc.cipemailverification.models.api.EmailAndPasscode
 import uk.gov.hmrc.cipemailverification.repositories.PasscodeCacheRepository
@@ -41,6 +42,7 @@ trait DataSteps {
     wsClient
       .url(s"$baseUrl/customer-insight-platform/email/verify")
       .withHttpHeaders(("Authorization", "fake-token"))
+      .withRequestFilter(AhcCurlRequestLogger())
       .post(Json.parse {
         s"""{"email": "$email"}""".stripMargin
       })

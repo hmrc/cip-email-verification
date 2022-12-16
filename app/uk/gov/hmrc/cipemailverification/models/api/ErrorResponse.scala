@@ -40,6 +40,7 @@ object ErrorResponse {
     val PASSCODE_ENTERED_EXPIRED = 1013
     val PASSCODE_NOT_FOUND = 1014
     val NOTIFICATION_NOT_FOUND = 1015
+    val REQUEST_STILL_PROCESSING = 1016
   }
 
   object Messages extends Enumeration {
@@ -55,5 +56,6 @@ object ErrorResponse {
     val ENTER_A_VALID_NOTIFICATION_ID = "Enter a valid notification Id"
     val NOTIFICATION_ID_NOT_FOUND = "Notification Id not found"
     val THROTTLED_TOO_MANY_REQUESTS = "The request for the API is throttled as you have exceeded your quota"
+    val REQUEST_IN_PROGRESS = "The request is still being processed"
   }
 }

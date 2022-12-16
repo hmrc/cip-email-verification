@@ -36,4 +36,6 @@ case object GovNotifyServiceDown extends ApplicationError
 
 case object GovNotifyTooManyRequests extends ApplicationError
 
+case object RequestInProgress extends ApplicationError
+
 case object NotFound extends ApplicationError

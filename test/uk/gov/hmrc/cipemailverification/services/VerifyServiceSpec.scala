@@ -22,9 +22,8 @@ import org.mockito.IdiomaticMockito
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import play.api.Configuration
-import play.api.http.Status._
 import play.api.libs.json.{Json, OWrites}
-import play.api.test.Helpers.{await, defaultAwaitTimeout}
+import play.api.test.Helpers._
 import uk.gov.hmrc.cipemailverification.config.AppConfig
 import uk.gov.hmrc.cipemailverification.connectors.{GovUkConnector, ValidateConnector}
 import uk.gov.hmrc.cipemailverification.metrics.MetricsService
@@ -47,16 +46,17 @@ class VerifyServiceSpec extends AnyWordSpec
   with IdiomaticMockito {
 
   "verify" should {
-    "return PasscodeSent if email address is valid" in new SetUp {
+    "return PasscodeSent if email address is valid and is a new entry" in new SetUp {
       private val email = Email("test")
       private val emailPasscodeDataFromDb = EmailAndPasscodeData(email.email, passcode, now)
+
+      passcodeServiceMock.retrievePasscode(any[String]).returns(Future.successful(None))
+      passcodeServiceMock.persistPasscode(any[EmailAndPasscodeData])
+        .returns(Future.successful(emailPasscodeDataFromDb))
 
       // return Ok from email validation
       validateConnectorMock.callService(email.email)
         .returns(Future.successful(HttpResponse(OK, """{"email": "test"}""")))
-
-      passcodeServiceMock.persistPasscode(any[EmailAndPasscodeData])
-        .returns(Future.successful(emailPasscodeDataFromDb))
 
       govUkConnectorMock.sendPasscode(emailPasscodeDataFromDb)
         .returns(Future.successful(HttpResponse(CREATED, Json.toJson(GovUkNotificationId("test-notification-id")).toString())))
@@ -72,6 +72,8 @@ class VerifyServiceSpec extends AnyWordSpec
       private val expectedAuditEvent = VerificationRequestAuditEvent("test", passcode)
       auditServiceMock.sendExplicitAuditEvent(EmailVerificationRequest,
         expectedAuditEvent) was called
+      // check to see if we check if email exists in db first
+      passcodeServiceMock.retrievePasscode(any[String]) was called
       // check what is sent to the cache
       passcodeServiceMock.persistPasscode(emailPasscodeDataFromDb) was called
       // Check what is sent to GovNotify
@@ -92,12 +94,56 @@ class VerifyServiceSpec extends AnyWordSpec
       govUkConnectorMock wasNever called
     }
 
+    "return too many requests if email address is valid and the email database entry(same) already exists" in new SetUp {
+      private val email = Email("test")
+      private val emailPasscodeDataFromDb = EmailAndPasscodeData(email.email, passcode, now)
+
+      passcodeServiceMock.retrievePasscode(any[String]).returns(Future.successful(Some(emailPasscodeDataFromDb)))
+      passcodeServiceMock.persistPasscode(any[EmailAndPasscodeData])
+        .returns(Future.successful(emailPasscodeDataFromDb))
+
+      // return Ok from email validation
+      validateConnectorMock.callService(email.email)
+        .returns(Future.successful(HttpResponse(OK, """{"email": "test"}""")))
+
+      govUkConnectorMock.sendPasscode(emailPasscodeDataFromDb)
+        .returns(Future.successful(HttpResponse(CREATED, Json.toJson(GovUkNotificationId("test-notification-id")).toString())))
+
+      private val result = verifyService.verifyEmail(email)
+
+      await(result) shouldBe Left(RequestInProgress)
+
+      // check what is sent to validation service
+      validateConnectorMock.callService("test")(any[HeaderCarrier]) was called
+      passcodeGeneratorMock.passcodeGenerator() was called
+      // check what is sent to the audit service
+      private val expectedAuditEvent = VerificationRequestAuditEvent("test", passcode)
+      // check what is sent to the cache
+      passcodeServiceMock.retrievePasscode(emailPasscodeDataFromDb.email) was called
+    }
+
+    "return bad request if email is invalid" in new SetUp {
+      private val enteredEmail = Email("test")
+      private val email = Email("test")
+      validateConnectorMock.callService(enteredEmail.email)
+        .returns(Future.successful(HttpResponse(BAD_REQUEST, """{"res": "res"}""")))
+
+      private val result = await(verifyService.verifyEmail(email))
+
+      result shouldBe Left(ValidationError)
+      passcodeGeneratorMock wasNever called
+      auditServiceMock wasNever called
+      passcodeServiceMock wasNever called
+      govUkConnectorMock wasNever called
+    }
+
     "return DatabaseServiceDown when datastore exception occurs" in new SetUp {
       private val email = Email("test")
       private val normalisedEmailAndPasscode = EmailAndPasscode("test", passcode)
       private val emailPasscodeDataFromDb = EmailAndPasscodeData(normalisedEmailAndPasscode.email, normalisedEmailAndPasscode.passcode, now)
       validateConnectorMock.callService(email.email)
         .returns(Future.successful(HttpResponse(OK, Json.toJson(ValidatedEmail(normalisedEmailAndPasscode.email)).toString())))
+      passcodeServiceMock.retrievePasscode(any[String]).returns(Future.successful(None))
       passcodeServiceMock.persistPasscode(any[EmailAndPasscodeData])
         .returns(Future.failed(new Exception("simulated database operation failure")))
 
@@ -110,10 +156,10 @@ class VerifyServiceSpec extends AnyWordSpec
       passcodeGeneratorMock.passcodeGenerator() was called
       // check what is sent to the audit service
       private val expectedAuditEvent = VerificationRequestAuditEvent("test", passcode)
-      auditServiceMock.sendExplicitAuditEvent(EmailVerificationRequest,
-        expectedAuditEvent) was called
       // check what is sent to DAO
       passcodeServiceMock.persistPasscode(emailPasscodeDataFromDb) was called
+
+      auditServiceMock.sendExplicitAuditEvent(EmailVerificationRequest,expectedAuditEvent) was called
 
       // Check NOTHING is sent to GovNotify
       govUkConnectorMock wasNever called
@@ -157,6 +203,7 @@ class VerifyServiceSpec extends AnyWordSpec
       private val emailPasscodeDataFromDb = EmailAndPasscodeData(normalisedEmailAndPasscode.email, normalisedEmailAndPasscode.passcode, now)
       validateConnectorMock.callService(email.email)
         .returns(Future.successful(HttpResponse(OK, Json.toJson(ValidatedEmail(normalisedEmailAndPasscode.email)).toString())))
+      passcodeServiceMock.retrievePasscode(any[String]).returns(Future.successful(None))
       passcodeServiceMock.persistPasscode(emailPasscodeDataFromDb)
         .returns(Future.successful(emailPasscodeDataFromDb))
       govUkConnectorMock.sendPasscode(any[EmailAndPasscodeData])
@@ -182,6 +229,7 @@ class VerifyServiceSpec extends AnyWordSpec
       private val emailPasscodeDataFromDb = EmailAndPasscodeData(normalisedEmailAndPasscode.email, normalisedEmailAndPasscode.passcode, now)
       validateConnectorMock.callService(email.email)
         .returns(Future.successful(HttpResponse(OK, Json.toJson(ValidatedEmail(normalisedEmailAndPasscode.email)).toString())))
+      passcodeServiceMock.retrievePasscode(any[String]).returns(Future.successful(None))
       passcodeServiceMock.persistPasscode(any[EmailAndPasscodeData])
         .returns(Future.successful(emailPasscodeDataFromDb))
       govUkConnectorMock.sendPasscode(any[EmailAndPasscodeData])
@@ -206,6 +254,7 @@ class VerifyServiceSpec extends AnyWordSpec
       private val emailPasscodeDataFromDb = EmailAndPasscodeData(normalisedEmailAndPasscode.email, normalisedEmailAndPasscode.passcode, now)
       validateConnectorMock.callService(email.email)
         .returns(Future.successful(HttpResponse(OK, Json.toJson(ValidatedEmail(normalisedEmailAndPasscode.email)).toString())))
+      passcodeServiceMock.retrievePasscode(any[String]).returns(Future.successful(None))
       passcodeServiceMock.persistPasscode(any[EmailAndPasscodeData])
         .returns(Future.successful(emailPasscodeDataFromDb))
       govUkConnectorMock.sendPasscode(any[EmailAndPasscodeData])
@@ -230,6 +279,7 @@ class VerifyServiceSpec extends AnyWordSpec
       private val emailPasscodeDataFromDb = EmailAndPasscodeData(normalisedEmailAndPasscode.email, normalisedEmailAndPasscode.passcode, now)
       validateConnectorMock.callService(email.email)
         .returns(Future.successful(HttpResponse(OK, Json.toJson(ValidatedEmail(normalisedEmailAndPasscode.email)).toString())))
+      passcodeServiceMock.retrievePasscode(any[String]).returns(Future.successful(None))
       passcodeServiceMock.persistPasscode(any[EmailAndPasscodeData])
         .returns(Future.successful(emailPasscodeDataFromDb))
       govUkConnectorMock.sendPasscode(any[EmailAndPasscodeData])
@@ -254,6 +304,7 @@ class VerifyServiceSpec extends AnyWordSpec
       private val emailPasscodeDataFromDb = EmailAndPasscodeData(normalisedEmailAndPasscode.email, normalisedEmailAndPasscode.passcode, now)
       validateConnectorMock.callService(email.email)
         .returns(Future.successful(HttpResponse(OK, Json.toJson(ValidatedEmail(normalisedEmailAndPasscode.email)).toString())))
+      passcodeServiceMock.retrievePasscode(any[String]).returns(Future.successful(None))
       passcodeServiceMock.persistPasscode(any[EmailAndPasscodeData])
         .returns(Future.successful(emailPasscodeDataFromDb))
       govUkConnectorMock.sendPasscode(any[EmailAndPasscodeData])
