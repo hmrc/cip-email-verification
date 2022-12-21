@@ -21,7 +21,6 @@ import io.jsonwebtoken.security.Keys
 import io.jsonwebtoken.{Jwts, SignatureAlgorithm}
 import play.api.Logging
 import play.api.libs.json.Json
-import play.api.libs.ws.ahc.AhcCurlRequestLogger
 import play.api.libs.ws.writeableOf_JsValue
 import uk.gov.hmrc.cipemailverification.config.{AppConfig, CircuitBreakerConfig}
 import uk.gov.hmrc.cipemailverification.models.domain.data.EmailAndPasscodeData
