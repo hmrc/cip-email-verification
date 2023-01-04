@@ -58,7 +58,7 @@ For reference here are the details for running each of the services individually
 
 #### Check notification status
 
-    -XGET -H "Content-type: application/json"-H "Authorization: TY8wpfCH-cyTL8mBiAsoPlbMW5eNYcdONHb0wNCWxlkP18UJoiIqBtbWbXCzgnlKWylcODd5y"
+    -XGET -H "Content-type: application/json" -H "Authorization: TY8wpfCH-cyTL8mBiAsoPlbMW5eNYcdONHb0wNCWxlkP18UJoiIqBtbWbXCzgnlKWylcODd5y"
     'https://cip-email-verification.protected.mdtp/customer-insight-platform/email/notifications/<notificationId>'
 
 #### Verify Passcode
