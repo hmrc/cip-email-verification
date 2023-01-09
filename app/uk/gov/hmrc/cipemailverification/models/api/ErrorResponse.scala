@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,5 +58,7 @@ object ErrorResponse {
     val NOTIFICATION_ID_NOT_FOUND = "Notification Id not found"
     val THROTTLED_TOO_MANY_REQUESTS = "The request for the API is throttled as you have exceeded your quota"
     val REQUEST_IN_PROGRESS = "The request is still being processed"
+    val PASSCODE_PERSIST_ERROR = "Error occurred while processing the request"
+    val PASSCODE_CHECK_ERROR = "Error occurred verifying the email"
   }
 }

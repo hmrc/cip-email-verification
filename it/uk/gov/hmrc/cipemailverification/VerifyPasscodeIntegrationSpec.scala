@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import play.api.libs.ws.ahc.AhcCurlRequestLogger
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes
 import uk.gov.hmrc.cipemailverification.utils.DataSteps
 
+import scala.util.Random
+
 class VerifyPasscodeIntegrationSpec
   extends AnyWordSpec
     with Matchers
@@ -34,15 +36,17 @@ class VerifyPasscodeIntegrationSpec
     with GuiceOneServerPerSuite
     with DataSteps {
 
+  private val emailRandomizer = Random.alphanumeric.take(10).mkString
+
   "/verify/passcode" should {
     "respond with 200 verified status with valid email and passcode" in {
-      val email = "test@test.com"
+      val email = s"$emailRandomizer@test.com"
 
       //generate EmailAndPasscode
       verify(email).futureValue
 
       //retrieve EmailAndPasscode
-      val maybeEmailAndPasscode = retrievePasscode("test@test.com").futureValue
+      val maybeEmailAndPasscode = retrievePasscode(email).futureValue
 
       //verify EmailAndPasscode (sut)
       val response =
@@ -61,7 +65,7 @@ class VerifyPasscodeIntegrationSpec
       response.status shouldBe 200
       (response.json \ "status").as[String] shouldBe "Verified"
     }
-    
+
     "respond with 400 status for invalid request" in {
       val response =
         wsClient
@@ -70,7 +74,7 @@ class VerifyPasscodeIntegrationSpec
           .withRequestFilter(AhcCurlRequestLogger())
           .post(Json.parse {
             s"""{
-               "email": "test@test.com",
+               "email": "$emailRandomizer@test.com",
                "passcode": ""
                }""".stripMargin
           })

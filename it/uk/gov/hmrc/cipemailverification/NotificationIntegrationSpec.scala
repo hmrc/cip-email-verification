@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ class NotificationIntegrationSpec
   "/notifications" should {
     "respond with 200 status with valid notification id" in {
       val emailRandomizer = Random.alphanumeric.take(10).mkString
+
       val verifyResponse = verify(s"$emailRandomizer@test.com").futureValue
 
       val notificationPath = verifyResponse.header("Location").get
