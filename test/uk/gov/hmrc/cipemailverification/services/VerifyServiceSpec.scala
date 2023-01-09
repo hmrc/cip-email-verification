@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package uk.gov.hmrc.cipemailverification.services
 
 import akka.stream.ConnectionException
+import com.mongodb.MongoTimeoutException
 import org.mockito.ArgumentMatchersSugar.any
 import org.mockito.IdiomaticMockito
 import org.scalatest.matchers.should.Matchers
@@ -118,6 +119,8 @@ class VerifyServiceSpec extends AnyWordSpec
       passcodeGeneratorMock.passcodeGenerator() was called
       // check what is sent to the audit service
       private val expectedAuditEvent = VerificationRequestAuditEvent("test", passcode)
+      auditServiceMock.sendExplicitAuditEvent(EmailVerificationRequest,
+        expectedAuditEvent) was called
       // check what is sent to the cache
       passcodeServiceMock.retrievePasscode(emailPasscodeDataFromDb.email) was called
     }
@@ -137,7 +140,84 @@ class VerifyServiceSpec extends AnyWordSpec
       govUkConnectorMock wasNever called
     }
 
-    "return DatabaseServiceDown when datastore exception occurs" in new SetUp {
+    "return DatabaseServiceDown when MongoTimeoutException occurs on retrieve" in new SetUp {
+      private val email = Email("test")
+      private val normalisedEmailAndPasscode = EmailAndPasscode("test", passcode)
+      validateConnectorMock.callService(email.email)
+        .returns(Future.successful(HttpResponse(OK, Json.toJson(ValidatedEmail(normalisedEmailAndPasscode.email)).toString())))
+      passcodeServiceMock.retrievePasscode(any[String])
+        .returns(Future.failed(new MongoTimeoutException("simulated database connection failure")))
+
+      private val result = await(verifyService.verifyEmail(email))
+
+      result shouldBe Left(DatabaseServiceDown)
+      // check what is sent to validation service
+      validateConnectorMock.callService(email.email)(any[HeaderCarrier]) was called
+      passcodeGeneratorMock.passcodeGenerator() was called
+      // check what is sent to the audit service
+      private val expectedAuditEvent = VerificationRequestAuditEvent("test", passcode)
+      // check what is sent to DAO
+      passcodeServiceMock.retrievePasscode(email.email) was called
+
+      auditServiceMock.sendExplicitAuditEvent(EmailVerificationRequest, expectedAuditEvent) was called
+
+      // Check NOTHING is sent to GovNotify
+      govUkConnectorMock wasNever called
+    }
+
+    "return DatabaseServiceError when datastore exception occurs on retrieve" in new SetUp {
+      private val email = Email("test")
+      private val normalisedEmailAndPasscode = EmailAndPasscode("test", passcode)
+      validateConnectorMock.callService(email.email)
+        .returns(Future.successful(HttpResponse(OK, Json.toJson(ValidatedEmail(normalisedEmailAndPasscode.email)).toString())))
+      passcodeServiceMock.retrievePasscode(any[String])
+        .returns(Future.failed(new Exception("simulated database operation failure")))
+
+      private val result = await(verifyService.verifyEmail(email))
+
+      result shouldBe Left(DatabaseServiceError)
+      // check what is sent to validation service
+      validateConnectorMock.callService(email.email)(any[HeaderCarrier]) was called
+      passcodeGeneratorMock.passcodeGenerator() was called
+      // check what is sent to the audit service
+      private val expectedAuditEvent = VerificationRequestAuditEvent("test", passcode)
+      // check what is sent to DAO
+      passcodeServiceMock.retrievePasscode(email.email) was called
+
+      auditServiceMock.sendExplicitAuditEvent(EmailVerificationRequest, expectedAuditEvent) was called
+
+      // Check NOTHING is sent to GovNotify
+      govUkConnectorMock wasNever called
+    }
+
+    "return DatabaseServiceDown when MongoTimeoutException occurs on persist" in new SetUp {
+      private val email = Email("test")
+      private val normalisedEmailAndPasscode = EmailAndPasscode("test", passcode)
+      private val emailPasscodeDataFromDb = EmailAndPasscodeData(normalisedEmailAndPasscode.email, normalisedEmailAndPasscode.passcode, now)
+      validateConnectorMock.callService(email.email)
+        .returns(Future.successful(HttpResponse(OK, Json.toJson(ValidatedEmail(normalisedEmailAndPasscode.email)).toString())))
+      passcodeServiceMock.retrievePasscode(any[String]).returns(Future.successful(None))
+      passcodeServiceMock.persistPasscode(any[EmailAndPasscodeData])
+        .returns(Future.failed(new MongoTimeoutException("simulated database connection failure")))
+
+      private val result = await(verifyService.verifyEmail(email))
+
+      result shouldBe Left(DatabaseServiceDown)
+      // check what is sent to validation service
+      validateConnectorMock.callService("test")(any[HeaderCarrier]) was called
+      passcodeGeneratorMock.passcodeGenerator() was called
+      // check what is sent to the audit service
+      private val expectedAuditEvent = VerificationRequestAuditEvent("test", passcode)
+      // check what is sent to DAO
+      passcodeServiceMock.persistPasscode(emailPasscodeDataFromDb) was called
+
+      auditServiceMock.sendExplicitAuditEvent(EmailVerificationRequest, expectedAuditEvent) was called
+
+      // Check NOTHING is sent to GovNotify
+      govUkConnectorMock wasNever called
+    }
+
+    "return DatabaseServiceError when datastore exception occurs on persist" in new SetUp {
       private val email = Email("test")
       private val normalisedEmailAndPasscode = EmailAndPasscode("test", passcode)
       private val emailPasscodeDataFromDb = EmailAndPasscodeData(normalisedEmailAndPasscode.email, normalisedEmailAndPasscode.passcode, now)
@@ -149,8 +229,7 @@ class VerifyServiceSpec extends AnyWordSpec
 
       private val result = await(verifyService.verifyEmail(email))
 
-      result shouldBe Left(DatabaseServiceDown)
-      //      result shouldBe Left(DatabaseServiceDown(PASSCODE_PERSISTING_FAIL, SERVER_EXPERIENCED_AN_ISSUE))
+      result shouldBe Left(DatabaseServiceError)
       // check what is sent to validation service
       validateConnectorMock.callService("test")(any[HeaderCarrier]) was called
       passcodeGeneratorMock.passcodeGenerator() was called
@@ -159,7 +238,7 @@ class VerifyServiceSpec extends AnyWordSpec
       // check what is sent to DAO
       passcodeServiceMock.persistPasscode(emailPasscodeDataFromDb) was called
 
-      auditServiceMock.sendExplicitAuditEvent(EmailVerificationRequest,expectedAuditEvent) was called
+      auditServiceMock.sendExplicitAuditEvent(EmailVerificationRequest, expectedAuditEvent) was called
 
       // Check NOTHING is sent to GovNotify
       govUkConnectorMock wasNever called
@@ -404,7 +483,20 @@ class VerifyServiceSpec extends AnyWordSpec
       auditServiceMock wasNever called
     }
 
-    "return DatabaseServiceDown when datastore exception occurs on get" in new SetUp {
+    "return DatabaseServiceDown when MongoTimeoutException occurs on retrieve" in new SetUp {
+      private val emailAndPasscode = EmailAndPasscode("enteredEmail", "enteredPasscode")
+      validateConnectorMock.callService(emailAndPasscode.email)
+        .returns(Future.successful(HttpResponse(OK, """{"email": "enteredEmail"}""")))
+      passcodeServiceMock.retrievePasscode(emailAndPasscode.email)
+        .returns(Future.failed(new MongoTimeoutException("simulated database connection failure")))
+
+      private val result = await(verifyService.verifyPasscode(emailAndPasscode))
+
+      result shouldBe Left(DatabaseServiceDown)
+      auditServiceMock wasNever called
+    }
+
+    "return DatabaseServiceError when datastore exception occurs on retrieve" in new SetUp {
       private val emailAndPasscode = EmailAndPasscode("enteredEmail", "enteredPasscode")
       validateConnectorMock.callService(emailAndPasscode.email)
         .returns(Future.successful(HttpResponse(OK, """{"email": "enteredEmail"}""")))
@@ -413,7 +505,7 @@ class VerifyServiceSpec extends AnyWordSpec
 
       private val result = await(verifyService.verifyPasscode(emailAndPasscode))
 
-      result shouldBe Left(DatabaseServiceDown)
+      result shouldBe Left(DatabaseServiceError)
       auditServiceMock wasNever called
     }
 

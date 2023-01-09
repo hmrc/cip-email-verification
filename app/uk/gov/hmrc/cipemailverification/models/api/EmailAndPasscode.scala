@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,11 +23,11 @@ import play.api.libs.json.{JsPath, Reads}
 case class EmailAndPasscode(email: String, passcode: String)
 
 object EmailAndPasscode {
-  val MIN_LENGTH_PASSCODE = 6
-  val MAX_LENGTH_PASSCODE = 6
+  private val MIN_LENGTH_PASSCODE = 6
+  private val MAX_LENGTH_PASSCODE = 6
 
   implicit val reads: Reads[EmailAndPasscode] = (
     (JsPath \ "email").read[String] and
       (JsPath \ "passcode").read[String](minLength[String](MIN_LENGTH_PASSCODE).keepAnd(maxLength[String](MAX_LENGTH_PASSCODE)))
-    ) (EmailAndPasscode.apply _)
+    )(EmailAndPasscode.apply _)
 }

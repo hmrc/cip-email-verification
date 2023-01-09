@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import play.api.libs.json.{JsSuccess, JsValue, Json, Reads}
 import play.api.mvc.{Action, ControllerComponents, Request, Result}
 import uk.gov.hmrc.cipemailverification.controllers.InternalAuthAccess.permission
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{EXTERNAL_SERVER_ERROR, EXTERNAL_SERVER_FAIL_FORBIDDEN, EXTERNAL_SERVER_FAIL_VALIDATION, EXTERNAL_SERVER_UNREACHABLE, MESSAGE_THROTTLED_OUT, PASSCODE_PERSISTING_FAIL, REQUEST_STILL_PROCESSING, SERVER_ERROR, SERVER_UNREACHABLE, VALIDATION_ERROR}
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{ENTER_A_VALID_EMAIL, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE, EXTERNAL_SERVER_EXPERIENCED_AN_ISSUE, REQUEST_IN_PROGRESS, SERVER_CURRENTLY_UNAVAILABLE, SERVER_EXPERIENCED_AN_ISSUE, THROTTLED_TOO_MANY_REQUESTS}
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{PASSCODE_PERSIST_ERROR, ENTER_A_VALID_EMAIL, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE, EXTERNAL_SERVER_EXPERIENCED_AN_ISSUE, REQUEST_IN_PROGRESS, SERVER_CURRENTLY_UNAVAILABLE, SERVER_EXPERIENCED_AN_ISSUE, THROTTLED_TOO_MANY_REQUESTS}
 import uk.gov.hmrc.cipemailverification.models.api.{Email, ErrorResponse}
 import uk.gov.hmrc.cipemailverification.models.domain.result._
 import uk.gov.hmrc.cipemailverification.services.VerifyService
@@ -42,8 +42,10 @@ class VerifyController @Inject()(cc: ControllerComponents, service: VerifyServic
         ErrorResponse(SERVER_ERROR, SERVER_EXPERIENCED_AN_ISSUE)))
       case ValidationServiceDown => ServiceUnavailable(Json.toJson(
         ErrorResponse(SERVER_UNREACHABLE, SERVER_CURRENTLY_UNAVAILABLE)))
-      case DatabaseServiceDown => InternalServerError(Json.toJson(
-        ErrorResponse(PASSCODE_PERSISTING_FAIL, SERVER_EXPERIENCED_AN_ISSUE)))
+      case DatabaseServiceDown => GatewayTimeout(Json.toJson(
+        ErrorResponse(EXTERNAL_SERVER_UNREACHABLE, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
+      case DatabaseServiceError => InternalServerError(Json.toJson(
+        ErrorResponse(PASSCODE_PERSISTING_FAIL, PASSCODE_PERSIST_ERROR)))
       case GovNotifyServiceDown => ServiceUnavailable(Json.toJson(
         ErrorResponse(EXTERNAL_SERVER_UNREACHABLE, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
       case GovNotifyServerError => BadGateway(Json.toJson(
