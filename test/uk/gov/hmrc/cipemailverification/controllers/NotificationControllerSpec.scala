@@ -24,8 +24,8 @@ import play.api.libs.json.Reads
 import play.api.mvc.AnyContentAsEmpty
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{Code, EXTERNAL_SERVER_UNREACHABLE, NOTIFICATION_NOT_FOUND, VALIDATION_ERROR}
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{ENTER_A_VALID_NOTIFICATION_ID, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE, Message, NOTIFICATION_ID_NOT_FOUND}
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{Code, EXTERNAL_SERVER_FAIL_FORBIDDEN, EXTERNAL_SERVER_UNREACHABLE, NOTIFICATION_NOT_FOUND, VALIDATION_ERROR}
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{ENTER_A_VALID_NOTIFICATION_ID, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE, Message, NOTIFICATION_ID_NOT_FOUND, SERVER_EXPERIENCED_AN_ISSUE}
 import uk.gov.hmrc.cipemailverification.models.api.NotificationStatus
 import uk.gov.hmrc.cipemailverification.models.api.NotificationStatus.Messages
 import uk.gov.hmrc.cipemailverification.models.api.NotificationStatus.Statuses.{CREATED, DELIVERED, PENDING, PERMANENT_FAILURE, SENDING, SENT, Status, TECHNICAL_FAILURE, TEMPORARY_FAILURE}
@@ -181,8 +181,8 @@ class NotificationControllerSpec extends AnyWordSpec
 
       private val result = controller.status(notificationId)(fakeRequest)
       status(result) shouldBe SERVICE_UNAVAILABLE
-      (contentAsJson(result) \ "code").as[Code] shouldBe EXTERNAL_SERVER_UNREACHABLE
-      (contentAsJson(result) \ "message").as[Message] shouldBe EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE
+      (contentAsJson(result) \ "code").as[Code] shouldBe EXTERNAL_SERVER_FAIL_FORBIDDEN
+      (contentAsJson(result) \ "message").as[Message] shouldBe SERVER_EXPERIENCED_AN_ISSUE
 
       mockNotificationsService.status(notificationId)(any[HeaderCarrier]) was called
     }
