@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,6 +75,7 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
     val passcode = passcodeGenerator.passcodeGenerator()
     val now = dateTimeUtils.getCurrentDateTime()
     val dataToSave = new EmailAndPasscodeData(email.email, passcode, now)
+    val MILLIS_IN_MIN = 60000
 
     auditService.sendExplicitAuditEvent(EmailVerificationRequest,
       VerificationRequestAuditEvent(dataToSave.email, passcode))
@@ -84,15 +85,21 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
         metricsService.recordMetric("mongo_cache_failure")
         logger.error(s"Database operation failed, ${err.getMessage}")
         Future.successful(Left(DatabaseServiceDown))
-      case Success(value) if value.isEmpty =>
-        passcodeService.persistPasscode(dataToSave) transformWith {
-          case Success(savedEmailPasscodeData) => sendPasscode(savedEmailPasscodeData)
-          case Failure(err) =>
-            metricsService.recordMetric("mongo_cache_failure")
-            logger.error(s"Database operation failed, ${err.getMessage}")
-            Future.successful(Left(DatabaseServiceDown))        }
-      case Success(value) if value.nonEmpty =>
-        Future.successful(Left(RequestInProgress))
+      case Success(v) if v.isEmpty => persistAndSendPasscode(dataToSave)
+      case Success(v) if (v.nonEmpty && (calculateElapsedTime(v.get.createdAt, now) > passcodeExpiry * MILLIS_IN_MIN)) =>
+        passcodeService.removePasscode(dataToSave.email)
+        persistAndSendPasscode(dataToSave)
+      case Success(v) if (v.nonEmpty) => Future.successful(Left(RequestInProgress))
+    }
+  }
+
+  private def persistAndSendPasscode(dataToSave: EmailAndPasscodeData)(implicit hc: HeaderCarrier) = {
+    passcodeService.persistPasscode(dataToSave) transformWith {
+      case Success(savedEmailPasscodeData) => sendPasscode(savedEmailPasscodeData)
+      case Failure(err) =>
+        metricsService.recordMetric("mongo_cache_failure")
+        logger.error(s"Database operation failed, ${err.getMessage}")
+        Future.successful(Left(DatabaseServiceDown))
     }
   }
 
@@ -136,8 +143,8 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
     }
   }
 
-  private def hasPasscodeExpired(foundPhoneNumberPasscodeData: EmailAndPasscodeData, currentTime: Long) = {
-    val elapsedTimeInMilliseconds: Long = calculateElapsedTime(foundPhoneNumberPasscodeData.createdAt, currentTime)
+  private def hasPasscodeExpired(foundEmailPasscodeData: EmailAndPasscodeData, currentTime: Long) = {
+    val elapsedTimeInMilliseconds: Long = calculateElapsedTime(foundEmailPasscodeData.createdAt, currentTime)
     val allowedTimeGapForPasscodeUsageInMilliseconds: Long = Duration.ofMinutes(passcodeExpiry).toMillis
     elapsedTimeInMilliseconds > allowedTimeGapForPasscodeUsageInMilliseconds
   }

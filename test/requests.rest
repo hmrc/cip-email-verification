@@ -4,7 +4,7 @@ content-type: application/json
 Authorization: fake-token
 
 {
-  "email" : "test1@test.com"
+  "email" : "atest65@test.com"
 }
 
 ### Badrequest
@@ -59,6 +59,6 @@ content-type: application/json
 Authorization: fake-token
 
 {
-  "email" : "test1@test.com",
-  "passcode":"EFMFGZ"
+  "email" : "atest65@test.com",
+  "passcode":"GWLGQR"
 }
