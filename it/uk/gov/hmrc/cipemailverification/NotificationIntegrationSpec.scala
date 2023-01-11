@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,8 +77,8 @@ class NotificationIntegrationSpec
           .futureValue
 
       response.status shouldBe 503
-      (response.json \ "code").as[Int] shouldBe Codes.EXTERNAL_SERVER_UNREACHABLE
-      (response.json \ "message").as[String] shouldBe "External server currently unavailable"
+      (response.json \ "code").as[Int] shouldBe Codes.EXTERNAL_SERVER_FAIL_FORBIDDEN
+      (response.json \ "message").as[String] shouldBe "Server has experienced an issue"
     }
   }
 }

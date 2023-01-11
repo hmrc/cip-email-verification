@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ package uk.gov.hmrc.cipemailverification.controllers
 import play.api.libs.json.Json
 import play.api.mvc.{Action, AnyContent, ControllerComponents}
 import uk.gov.hmrc.cipemailverification.controllers.InternalAuthAccess.permission
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{EXTERNAL_SERVER_UNREACHABLE, NOTIFICATION_NOT_FOUND, VALIDATION_ERROR}
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{ENTER_A_VALID_NOTIFICATION_ID, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE, NOTIFICATION_ID_NOT_FOUND}
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{EXTERNAL_SERVER_FAIL_FORBIDDEN, EXTERNAL_SERVER_UNREACHABLE, NOTIFICATION_NOT_FOUND, VALIDATION_ERROR}
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{ENTER_A_VALID_NOTIFICATION_ID, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE, NOTIFICATION_ID_NOT_FOUND, SERVER_EXPERIENCED_AN_ISSUE}
 import uk.gov.hmrc.cipemailverification.models.api.NotificationStatus.{Messages, Statuses}
 import uk.gov.hmrc.cipemailverification.models.api.{ErrorResponse, NotificationStatus}
 import uk.gov.hmrc.cipemailverification.models.domain.result._
@@ -35,7 +35,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class NotificationController @Inject()(cc: ControllerComponents, notificationsService: NotificationService, auth: BackendAuthComponents)
   extends BackendController(cc) {
 
-    def status(notificationId: String): Action[AnyContent] = auth.authorizedAction[Unit](permission).compose(Action).async { implicit request =>
+  def status(notificationId: String): Action[AnyContent] = auth.authorizedAction[Unit](permission).compose(Action).async { implicit request =>
     notificationsService.status(notificationId) map {
       case Right(uk.gov.hmrc.cipemailverification.models.domain.result.Created) => Ok(Json.toJson(NotificationStatus(Statuses.CREATED, Messages.CREATED)))
       case Right(Sending) => Ok(Json.toJson(NotificationStatus(Statuses.SENDING, Messages.SENDING)))
@@ -48,7 +48,7 @@ class NotificationController @Inject()(cc: ControllerComponents, notificationsSe
       case Left(uk.gov.hmrc.cipemailverification.models.domain.result.NotFound) => NotFound(Json.toJson(ErrorResponse(NOTIFICATION_NOT_FOUND, NOTIFICATION_ID_NOT_FOUND)))
       case Left(ValidationError) => BadRequest(Json.toJson(ErrorResponse(VALIDATION_ERROR, ENTER_A_VALID_NOTIFICATION_ID)))
       case Left(GovNotifyForbidden) => ServiceUnavailable(Json.toJson(
-        ErrorResponse(EXTERNAL_SERVER_UNREACHABLE, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
+        ErrorResponse(EXTERNAL_SERVER_FAIL_FORBIDDEN, SERVER_EXPERIENCED_AN_ISSUE)))
       case Left(GovNotifyServiceDown) => GatewayTimeout(Json.toJson(
         ErrorResponse(EXTERNAL_SERVER_UNREACHABLE, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
     }
