@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import play.api.Logging
 import play.api.libs.json._
 import play.api.mvc.{Action, ControllerComponents, Request, Result}
 import uk.gov.hmrc.cipemailverification.controllers.InternalAuthAccess.permission
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{PASSCODE_CHECK_FAIL, PASSCODE_ENTERED_EXPIRED, PASSCODE_NOT_FOUND, SERVER_UNREACHABLE, VALIDATION_ERROR}
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{PASSCODE_CHECK_FAIL, PASSCODE_ENTERED_EXPIRED, PASSCODE_NOT_FOUND, SERVER_ERROR, SERVER_UNREACHABLE, VALIDATION_ERROR}
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{ENTER_A_CORRECT_PASSCODE, ENTER_A_VALID_EMAIL, PASSCODE_ALLOWED_TIME_ELAPSED, SERVER_CURRENTLY_UNAVAILABLE, SERVER_EXPERIENCED_AN_ISSUE}
 import uk.gov.hmrc.cipemailverification.models.api.VerificationStatus.Messages.{NOT_VERIFIED, VERIFIED}
 import uk.gov.hmrc.cipemailverification.models.api.{EmailAndPasscode, ErrorResponse, VerificationStatus}
@@ -52,7 +52,7 @@ class VerifyPasscodeController @Inject()(cc: ControllerComponents, service: Veri
           case Left(DatabaseServiceDown) => InternalServerError(Json.toJson(
             ErrorResponse(PASSCODE_CHECK_FAIL, SERVER_EXPERIENCED_AN_ISSUE)))
           case Left(ValidationServiceError) => BadGateway(Json.toJson(
-            ErrorResponse(SERVER_UNREACHABLE, SERVER_CURRENTLY_UNAVAILABLE)))
+            ErrorResponse(SERVER_ERROR, SERVER_EXPERIENCED_AN_ISSUE)))
           case Left(ValidationServiceDown) => ServiceUnavailable(Json.toJson(
             ErrorResponse(SERVER_UNREACHABLE, SERVER_CURRENTLY_UNAVAILABLE)))
         }
