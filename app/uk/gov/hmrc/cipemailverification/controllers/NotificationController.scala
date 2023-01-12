@@ -19,8 +19,8 @@ package uk.gov.hmrc.cipemailverification.controllers
 import play.api.libs.json.Json
 import play.api.mvc.{Action, AnyContent, ControllerComponents}
 import uk.gov.hmrc.cipemailverification.controllers.InternalAuthAccess.permission
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{EXTERNAL_SERVER_UNREACHABLE, NOTIFICATION_NOT_FOUND, VALIDATION_ERROR}
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{ENTER_A_VALID_NOTIFICATION_ID, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE, NOTIFICATION_ID_NOT_FOUND}
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{EXTERNAL_SERVER_FAIL_FORBIDDEN, EXTERNAL_SERVER_UNREACHABLE, NOTIFICATION_NOT_FOUND, VALIDATION_ERROR}
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{ENTER_A_VALID_NOTIFICATION_ID, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE, NOTIFICATION_ID_NOT_FOUND, SERVER_EXPERIENCED_AN_ISSUE}
 import uk.gov.hmrc.cipemailverification.models.api.NotificationStatus.{Messages, Statuses}
 import uk.gov.hmrc.cipemailverification.models.api.{ErrorResponse, NotificationStatus}
 import uk.gov.hmrc.cipemailverification.models.domain.result._
@@ -41,7 +41,7 @@ class NotificationController @Inject()(cc: ControllerComponents, notificationsSe
         NotFound(Json.toJson(ErrorResponse(NOTIFICATION_NOT_FOUND, NOTIFICATION_ID_NOT_FOUND)))
       case ValidationError => BadRequest(Json.toJson(ErrorResponse(VALIDATION_ERROR, ENTER_A_VALID_NOTIFICATION_ID)))
       case GovNotifyForbidden => ServiceUnavailable(Json.toJson(
-        ErrorResponse(EXTERNAL_SERVER_UNREACHABLE, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
+        ErrorResponse(EXTERNAL_SERVER_FAIL_FORBIDDEN, SERVER_EXPERIENCED_AN_ISSUE)))
       case GovNotifyServiceDown => GatewayTimeout(Json.toJson(
         ErrorResponse(EXTERNAL_SERVER_UNREACHABLE, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
     }
