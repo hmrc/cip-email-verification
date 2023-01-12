@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,15 +26,15 @@ import play.api.mvc.AnyContentAsEmpty
 import play.api.test.Helpers.{contentAsJson, defaultAwaitTimeout, status}
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.cipemailverification.models.api.EmailAndPasscode
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{Code, PASSCODE_CHECK_FAIL, PASSCODE_ENTERED_EXPIRED, PASSCODE_NOT_FOUND, SERVER_UNREACHABLE, VALIDATION_ERROR}
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{ENTER_A_CORRECT_PASSCODE, ENTER_A_VALID_EMAIL, Message, PASSCODE_ALLOWED_TIME_ELAPSED, SERVER_CURRENTLY_UNAVAILABLE, SERVER_EXPERIENCED_AN_ISSUE}
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{Code, EXTERNAL_SERVER_UNREACHABLE, PASSCODE_CHECK_FAIL, PASSCODE_ENTERED_EXPIRED, PASSCODE_NOT_FOUND, SERVER_UNREACHABLE, VALIDATION_ERROR}
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{ENTER_A_CORRECT_PASSCODE, ENTER_A_VALID_EMAIL, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE, Message, PASSCODE_ALLOWED_TIME_ELAPSED, PASSCODE_CHECK_ERROR, SERVER_CURRENTLY_UNAVAILABLE}
 import uk.gov.hmrc.cipemailverification.models.api.VerificationStatus.Messages.{NOT_VERIFIED, VERIFIED}
 import uk.gov.hmrc.cipemailverification.models.domain.result._
 import uk.gov.hmrc.cipemailverification.services.VerifyService
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.internalauth.client.Predicate.Permission
-import uk.gov.hmrc.internalauth.client.test.{BackendAuthComponentsStub, StubBehaviour}
 import uk.gov.hmrc.internalauth.client._
+import uk.gov.hmrc.internalauth.client.test.{BackendAuthComponentsStub, StubBehaviour}
 
 import scala.concurrent.ExecutionContext.Implicits
 import scala.concurrent.Future
@@ -113,16 +113,30 @@ class VerifyPasscodeControllerSpec
       mockVerifyService.verifyPasscode(emailAndPasscode)(any[HeaderCarrier]) was called
     }
 
-    "return InternalServerError when verify service returns DatabaseServiceDown" in new SetUp {
+    "return GatewayTimeout when verify service returns DatabaseServiceDown" in new SetUp {
       private val emailAndPasscode = EmailAndPasscode("test", "123456")
       mockVerifyService.verifyPasscode(emailAndPasscode)(any[HeaderCarrier])
         .returns(Future.successful(Left(DatabaseServiceDown)))
       private val result = controller.verifyPasscode(
         fakeRequest.withBody(Json.toJson(emailAndPasscode))
       )
+      status(result) shouldBe GATEWAY_TIMEOUT
+      (contentAsJson(result) \ "code").as[Code] shouldBe EXTERNAL_SERVER_UNREACHABLE
+      (contentAsJson(result) \ "message").as[Message] shouldBe EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE
+
+      mockVerifyService.verifyPasscode(emailAndPasscode)(any[HeaderCarrier]) was called
+    }
+
+    "return InternalServerError when verify service returns DatabaseServiceError" in new SetUp {
+      private val emailAndPasscode = EmailAndPasscode("test", "123456")
+      mockVerifyService.verifyPasscode(emailAndPasscode)(any[HeaderCarrier])
+        .returns(Future.successful(Left(DatabaseServiceError)))
+      private val result = controller.verifyPasscode(
+        fakeRequest.withBody(Json.toJson(emailAndPasscode))
+      )
       status(result) shouldBe INTERNAL_SERVER_ERROR
       (contentAsJson(result) \ "code").as[Code] shouldBe PASSCODE_CHECK_FAIL
-      (contentAsJson(result) \ "message").as[Message] shouldBe SERVER_EXPERIENCED_AN_ISSUE
+      (contentAsJson(result) \ "message").as[Message] shouldBe PASSCODE_CHECK_ERROR
 
       mockVerifyService.verifyPasscode(emailAndPasscode)(any[HeaderCarrier]) was called
     }

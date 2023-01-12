@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,8 @@ case object ValidationError extends ApplicationError
 case object ValidationServiceError extends ApplicationError
 
 case object DatabaseServiceDown extends ApplicationError
+
+case object DatabaseServiceError extends ApplicationError
 
 case object GovNotifyBadRequest extends ApplicationError
 

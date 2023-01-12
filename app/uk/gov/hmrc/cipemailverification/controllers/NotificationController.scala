@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,22 +35,31 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class NotificationController @Inject()(cc: ControllerComponents, notificationsService: NotificationService, auth: BackendAuthComponents)
   extends BackendController(cc) {
 
-    def status(notificationId: String): Action[AnyContent] = auth.authorizedAction[Unit](permission).compose(Action).async { implicit request =>
+  def status(notificationId: String): Action[AnyContent] = auth.authorizedAction[Unit](permission).compose(Action).async { implicit request =>
+    def onError(error: ApplicationError) = error match {
+      case uk.gov.hmrc.cipemailverification.models.domain.result.NotFound =>
+        NotFound(Json.toJson(ErrorResponse(NOTIFICATION_NOT_FOUND, NOTIFICATION_ID_NOT_FOUND)))
+      case ValidationError => BadRequest(Json.toJson(ErrorResponse(VALIDATION_ERROR, ENTER_A_VALID_NOTIFICATION_ID)))
+      case GovNotifyForbidden => ServiceUnavailable(Json.toJson(
+        ErrorResponse(EXTERNAL_SERVER_UNREACHABLE, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
+      case GovNotifyServiceDown => GatewayTimeout(Json.toJson(
+        ErrorResponse(EXTERNAL_SERVER_UNREACHABLE, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
+    }
+
+    def onSuccess(result: NotificationStatusResult) = result match {
+      case uk.gov.hmrc.cipemailverification.models.domain.result.Created => Ok(Json.toJson(NotificationStatus(Statuses.CREATED, Messages.CREATED)))
+      case Sending => Ok(Json.toJson(NotificationStatus(Statuses.SENDING, Messages.SENDING)))
+      case Pending => Ok(Json.toJson(NotificationStatus(Statuses.PENDING, Messages.PENDING)))
+      case Sent => Ok(Json.toJson(NotificationStatus(Statuses.SENT, Messages.SENT)))
+      case Delivered => Ok(Json.toJson(NotificationStatus(Statuses.DELIVERED, Messages.DELIVERED)))
+      case PermanentFailure => Ok(Json.toJson(NotificationStatus(Statuses.PERMANENT_FAILURE, Messages.PERMANENT_FAILURE)))
+      case TemporaryFailure => Ok(Json.toJson(NotificationStatus(Statuses.TEMPORARY_FAILURE, Messages.TEMPORARY_FAILURE)))
+      case TechnicalFailure => Ok(Json.toJson(NotificationStatus(Statuses.TECHNICAL_FAILURE, Messages.TECHNICAL_FAILURE)))
+    }
+
     notificationsService.status(notificationId) map {
-      case Right(uk.gov.hmrc.cipemailverification.models.domain.result.Created) => Ok(Json.toJson(NotificationStatus(Statuses.CREATED, Messages.CREATED)))
-      case Right(Sending) => Ok(Json.toJson(NotificationStatus(Statuses.SENDING, Messages.SENDING)))
-      case Right(Pending) => Ok(Json.toJson(NotificationStatus(Statuses.PENDING, Messages.PENDING)))
-      case Right(Sent) => Ok(Json.toJson(NotificationStatus(Statuses.SENT, Messages.SENT)))
-      case Right(Delivered) => Ok(Json.toJson(NotificationStatus(Statuses.DELIVERED, Messages.DELIVERED)))
-      case Right(PermanentFailure) => Ok(Json.toJson(NotificationStatus(Statuses.PERMANENT_FAILURE, Messages.PERMANENT_FAILURE)))
-      case Right(TemporaryFailure) => Ok(Json.toJson(NotificationStatus(Statuses.TEMPORARY_FAILURE, Messages.TEMPORARY_FAILURE)))
-      case Right(TechnicalFailure) => Ok(Json.toJson(NotificationStatus(Statuses.TECHNICAL_FAILURE, Messages.TECHNICAL_FAILURE)))
-      case Left(uk.gov.hmrc.cipemailverification.models.domain.result.NotFound) => NotFound(Json.toJson(ErrorResponse(NOTIFICATION_NOT_FOUND, NOTIFICATION_ID_NOT_FOUND)))
-      case Left(ValidationError) => BadRequest(Json.toJson(ErrorResponse(VALIDATION_ERROR, ENTER_A_VALID_NOTIFICATION_ID)))
-      case Left(GovNotifyForbidden) => ServiceUnavailable(Json.toJson(
-        ErrorResponse(EXTERNAL_SERVER_UNREACHABLE, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
-      case Left(GovNotifyServiceDown) => GatewayTimeout(Json.toJson(
-        ErrorResponse(EXTERNAL_SERVER_UNREACHABLE, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
+      case Left(error) => onError(error)
+      case Right(result) => onSuccess(result)
     }
   }
 }

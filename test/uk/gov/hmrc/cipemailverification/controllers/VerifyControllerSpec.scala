@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import play.api.test.Helpers.{LOCATION, contentAsJson, contentAsString, defaultA
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.cipemailverification.models.api.Email
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{Code, EXTERNAL_SERVER_ERROR, EXTERNAL_SERVER_FAIL_FORBIDDEN, EXTERNAL_SERVER_FAIL_VALIDATION, EXTERNAL_SERVER_UNREACHABLE, MESSAGE_THROTTLED_OUT, PASSCODE_PERSISTING_FAIL, SERVER_ERROR, SERVER_UNREACHABLE, VALIDATION_ERROR}
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{ENTER_A_VALID_EMAIL, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE, EXTERNAL_SERVER_EXPERIENCED_AN_ISSUE, Message, SERVER_CURRENTLY_UNAVAILABLE, SERVER_EXPERIENCED_AN_ISSUE, THROTTLED_TOO_MANY_REQUESTS}
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{ENTER_A_VALID_EMAIL, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE, EXTERNAL_SERVER_EXPERIENCED_AN_ISSUE, Message, PASSCODE_PERSIST_ERROR, SERVER_CURRENTLY_UNAVAILABLE, SERVER_EXPERIENCED_AN_ISSUE, THROTTLED_TOO_MANY_REQUESTS}
 import uk.gov.hmrc.cipemailverification.models.domain.result._
 import uk.gov.hmrc.cipemailverification.models.http.govnotify.GovUkNotificationId
 import uk.gov.hmrc.cipemailverification.services.VerifyService
@@ -74,16 +74,30 @@ class VerifyControllerSpec
       mockVerifyService.verifyEmail(email)(any[HeaderCarrier]) was called
     }
 
-    "return InternalServerError when verify service returns DatabaseServiceDown" in new SetUp {
+    "return GatewayTimeout when verify service returns DatabaseServiceDown" in new SetUp {
       private val email = Email("test@test.test")
       mockVerifyService.verifyEmail(email)(any[HeaderCarrier])
         .returns(Future.successful(Left(DatabaseServiceDown)))
       private val result = controller.verify(
         fakeRequest.withBody(Json.toJson(email))
       )
+      status(result) shouldBe GATEWAY_TIMEOUT
+      (contentAsJson(result) \ "code").as[Code] shouldBe EXTERNAL_SERVER_UNREACHABLE
+      (contentAsJson(result) \ "message").as[Message] shouldBe EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE
+
+      mockVerifyService.verifyEmail(email)(any[HeaderCarrier]) was called
+    }
+
+    "return InternalServerError when verify service returns DatabaseServiceError" in new SetUp {
+      private val email = Email("test@test.test")
+      mockVerifyService.verifyEmail(email)(any[HeaderCarrier])
+        .returns(Future.successful(Left(DatabaseServiceError)))
+      private val result = controller.verify(
+        fakeRequest.withBody(Json.toJson(email))
+      )
       status(result) shouldBe INTERNAL_SERVER_ERROR
       (contentAsJson(result) \ "code").as[Code] shouldBe PASSCODE_PERSISTING_FAIL
-      (contentAsJson(result) \ "message").as[Message] shouldBe SERVER_EXPERIENCED_AN_ISSUE
+      (contentAsJson(result) \ "message").as[Message] shouldBe PASSCODE_PERSIST_ERROR
 
       mockVerifyService.verifyEmail(email)(any[HeaderCarrier]) was called
     }

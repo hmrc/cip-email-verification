@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.cipemailverification.services
 
+import com.mongodb.MongoTimeoutException
 import play.api.Logging
 import play.api.http.Status.{BAD_REQUEST, FORBIDDEN, INTERNAL_SERVER_ERROR, TOO_MANY_REQUESTS}
 import uk.gov.hmrc.cipemailverification.config.AppConfig
@@ -80,17 +81,31 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
       VerificationRequestAuditEvent(dataToSave.email, passcode))
 
     passcodeService.retrievePasscode(email.email) transformWith {
-      case Failure(err) =>
-        metricsService.recordMetric("mongo_cache_failure")
-        logger.error(s"Database operation failed, ${err.getMessage}")
-        Future.successful(Left(DatabaseServiceDown))
+      case Failure(err) => err match {
+        case _: MongoTimeoutException =>
+          metricsService.recordMetric("mongo_cache_failure")
+          logger.error(s"Database connection failed, ${err.getMessage}")
+          Future.successful(Left(DatabaseServiceDown))
+        case _ =>
+          metricsService.recordMetric("mongo_cache_failure")
+          logger.error(s"Database operation failed, ${err.getMessage}")
+          Future.successful(Left(DatabaseServiceError))
+      }
+
       case Success(value) if value.isEmpty =>
         passcodeService.persistPasscode(dataToSave) transformWith {
           case Success(savedEmailPasscodeData) => sendPasscode(savedEmailPasscodeData)
-          case Failure(err) =>
-            metricsService.recordMetric("mongo_cache_failure")
-            logger.error(s"Database operation failed, ${err.getMessage}")
-            Future.successful(Left(DatabaseServiceDown))        }
+          case Failure(err) => err match {
+            case _: MongoTimeoutException =>
+              metricsService.recordMetric("mongo_cache_failure")
+              logger.error(s"Database connection failed, ${err.getMessage}")
+              Future.successful(Left(DatabaseServiceDown))
+            case _ =>
+              metricsService.recordMetric("mongo_cache_failure")
+              logger.error(s"Database operation failed, ${err.getMessage}")
+              Future.successful(Left(DatabaseServiceError))
+          }
+        }
       case Success(value) if value.nonEmpty =>
         Future.successful(Left(RequestInProgress))
     }
@@ -102,10 +117,16 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
       maybeEmailAndPasscodeData <- passcodeService.retrievePasscode(validatedEmail.email)
       result <- processPasscode(EmailAndPasscode(validatedEmail.email, passcode), maybeEmailAndPasscodeData)
     } yield result).recover {
-      case err =>
-        metricsService.recordMetric("mongo_cache_failure")
-        logger.error(s"Database operation failed - ${err.getMessage}")
-        Left(DatabaseServiceDown)
+      case err => err match {
+        case _: MongoTimeoutException =>
+          metricsService.recordMetric("mongo_cache_failure")
+          logger.error(s"Database connection failed - ${err.getMessage}")
+          Left(DatabaseServiceDown)
+        case _ =>
+          metricsService.recordMetric("mongo_cache_failure")
+          logger.error(s"Database operation failed, ${err.getMessage}")
+          Left(DatabaseServiceError)
+      }
     }
   }
 
