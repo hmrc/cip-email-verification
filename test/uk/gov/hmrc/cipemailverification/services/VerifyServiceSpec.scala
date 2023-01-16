@@ -95,9 +95,43 @@ class VerifyServiceSpec extends AnyWordSpec
       govUkConnectorMock wasNever called
     }
 
+    "return Ok if passcode has expired and email is valid" in new SetUp {
+      private val email = Email("test")
+      val MILLIS_IN_MIN = 60000 // 1 min -> 60000 millis
+      val ELAPSED_TIME_MINS = 20 // mins
+      private val emailPasscodeDataFromDb = EmailAndPasscodeData(email.email, passcode, now - (ELAPSED_TIME_MINS * MILLIS_IN_MIN))
+
+      passcodeServiceMock.retrievePasscode(any[String]).returns(Future.successful(Some(emailPasscodeDataFromDb)))
+      passcodeServiceMock.persistPasscode(any[EmailAndPasscodeData])
+        .returns(Future.successful(emailPasscodeDataFromDb))
+
+      // return Ok from email validation
+      validateConnectorMock.callService(email.email)
+        .returns(Future.successful(HttpResponse(OK, """{"email": "test"}""")))
+
+      govUkConnectorMock.sendPasscode(emailPasscodeDataFromDb)
+        .returns(Future.successful(HttpResponse(CREATED, Json.toJson(GovUkNotificationId("test-notification-id")).toString())))
+
+      private val result = verifyService.verifyEmail(email)
+
+      await(result) shouldBe Right(PasscodeSent(GovUkNotificationId("test-notification-id")))
+
+      // check what is sent to validation service
+      validateConnectorMock.callService("test")(any[HeaderCarrier]) was called
+      passcodeGeneratorMock.passcodeGenerator() was called
+      // check what is sent to the audit service
+      private val expectedAuditEvent = VerificationRequestAuditEvent("test", passcode)
+      auditServiceMock.sendExplicitAuditEvent(EmailVerificationRequest,
+        expectedAuditEvent) was called
+      // check what is sent to the cache
+      passcodeServiceMock.retrievePasscode(emailPasscodeDataFromDb.email) was called
+    }
+
     "return too many requests if email address is valid and the email database entry(same) already exists" in new SetUp {
       private val email = Email("test")
-      private val emailPasscodeDataFromDb = EmailAndPasscodeData(email.email, passcode, now)
+      val MILLIS_IN_MIN = 60000 // 1 min -> 60000 millis
+      val ELAPSED_TIME_MINS = 1 // mins
+      private val emailPasscodeDataFromDb = EmailAndPasscodeData(email.email, passcode, now - (ELAPSED_TIME_MINS * MILLIS_IN_MIN))
 
       passcodeServiceMock.retrievePasscode(any[String]).returns(Future.successful(Some(emailPasscodeDataFromDb)))
       passcodeServiceMock.persistPasscode(any[EmailAndPasscodeData])
