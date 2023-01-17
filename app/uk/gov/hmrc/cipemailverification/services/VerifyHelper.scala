@@ -190,7 +190,9 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
 
     govUkConnector.sendPasscode(data) transformWith {
       case Success(response) => response match {
-        case _ if is2xx(response.status) => Future.successful(success(response))
+        case _ if is2xx(response.status) =>
+          metricsService.recordMetric("gov-notify_call_success")
+          Future.successful(success(response))
         case _ => Future.successful(failure(response))
       }
       case Failure(response) =>
