@@ -19,7 +19,6 @@ package uk.gov.hmrc.cipemailverification.controllers
 import play.api.Logging
 import play.api.libs.json._
 import play.api.mvc.{Action, ControllerComponents, Request, Result}
-import uk.gov.hmrc.cipemailverification.controllers.InternalAuthAccess.permission
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{EXTERNAL_SERVER_UNREACHABLE, PASSCODE_CHECK_FAIL, PASSCODE_ENTERED_EXPIRED, PASSCODE_NOT_FOUND, SERVER_ERROR, SERVER_UNREACHABLE, VALIDATION_ERROR}
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{ENTER_A_CORRECT_PASSCODE, ENTER_A_VALID_EMAIL, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE, PASSCODE_ALLOWED_TIME_ELAPSED, PASSCODE_CHECK_ERROR, SERVER_CURRENTLY_UNAVAILABLE, SERVER_EXPERIENCED_AN_ISSUE}
 import uk.gov.hmrc.cipemailverification.models.api.VerificationStatus.Messages.{NOT_VERIFIED, VERIFIED}
@@ -35,8 +34,7 @@ import scala.concurrent.Future
 
 @Singleton()
 class VerifyPasscodeController @Inject()(cc: ControllerComponents, service: VerifyService, auth: BackendAuthComponents)
-  extends BackendController(cc)
-    with Logging {
+  extends BackendController(cc) with InternalAuthAccess with Logging {
 
   def verifyPasscode: Action[JsValue] = auth.authorizedAction[Unit](permission).compose(Action(parse.json)).async { implicit request =>
     def onError(error: ApplicationError) = error match {
@@ -49,7 +47,7 @@ class VerifyPasscodeController @Inject()(cc: ControllerComponents, service: Veri
         ErrorResponse(PASSCODE_CHECK_FAIL, PASSCODE_CHECK_ERROR)))
       case ValidationServiceError => BadGateway(Json.toJson(
         ErrorResponse(SERVER_ERROR, SERVER_EXPERIENCED_AN_ISSUE)))
-      case ValidationServiceDown => ServiceUnavailable(Json.toJson(
+      case ValidationServiceDown => GatewayTimeout(Json.toJson(
         ErrorResponse(SERVER_UNREACHABLE, SERVER_CURRENTLY_UNAVAILABLE)))
     }
 

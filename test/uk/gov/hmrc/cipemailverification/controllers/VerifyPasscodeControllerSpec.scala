@@ -155,14 +155,14 @@ class VerifyPasscodeControllerSpec
       mockVerifyService.verifyPasscode(emailAndPasscode)(any[HeaderCarrier]) was called
     }
 
-    "return ServiceUnavailable when verify service returns ValidationServiceDown" in new SetUp {
+    "return GatewayTimeout when verify service returns ValidationServiceDown" in new SetUp {
       private val emailAndPasscode = EmailAndPasscode("test", "123456")
       mockVerifyService.verifyPasscode(emailAndPasscode)(any[HeaderCarrier])
         .returns(Future.successful(Left(ValidationServiceDown)))
       private val result = controller.verifyPasscode(
         fakeRequest.withBody(Json.toJson(emailAndPasscode))
       )
-      status(result) shouldBe SERVICE_UNAVAILABLE
+      status(result) shouldBe GATEWAY_TIMEOUT
       (contentAsJson(result) \ "code").as[Code] shouldBe SERVER_UNREACHABLE
       (contentAsJson(result) \ "message").as[Message] shouldBe SERVER_CURRENTLY_UNAVAILABLE
 

@@ -68,7 +68,7 @@ class NotificationIntegrationSpec
       (response.json \ "message").as[String] shouldBe "Notification Id not found"
     }
 
-    "respond with 503 status when systemclock is not in sync" in {
+    "respond with 500 status when systemclock is not in sync" in {
       val response =
         wsClient
           .url(s"$baseUrl/customer-insight-platform/email/notifications/systemclock-d385-4b17-a0b4-23a85c0c5b1a")
@@ -77,7 +77,7 @@ class NotificationIntegrationSpec
           .get
           .futureValue
 
-      response.status shouldBe 503
+      response.status shouldBe 500
       (response.json \ "code").as[Int] shouldBe Codes.EXTERNAL_SERVER_FAIL_FORBIDDEN
       (response.json \ "message").as[String] shouldBe "Server has experienced an issue"
     }
