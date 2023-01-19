@@ -76,38 +76,17 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
     val passcode = passcodeGenerator.passcodeGenerator()
     val now = dateTimeUtils.getCurrentDateTime()
     val dataToSave = new EmailAndPasscodeData(email.email, passcode, now)
+    val MILLIS_IN_MIN = 60000
 
     auditService.sendExplicitAuditEvent(EmailVerificationRequest,
       VerificationRequestAuditEvent(dataToSave.email, passcode))
 
     passcodeService.retrievePasscode(email.email) transformWith {
-      case Failure(err) => err match {
-        case _: MongoTimeoutException =>
-          metricsService.recordMetric("mongo_cache_failure")
-          logger.error(s"Database connection failed, ${err.getMessage}")
-          Future.successful(Left(DatabaseServiceDown))
-        case _ =>
-          metricsService.recordMetric("mongo_cache_failure")
-          logger.error(s"Database operation failed, ${err.getMessage}")
-          Future.successful(Left(DatabaseServiceError))
-      }
-
-      case Success(value) if value.isEmpty =>
-        passcodeService.persistPasscode(dataToSave) transformWith {
-          case Success(savedEmailPasscodeData) => sendPasscode(savedEmailPasscodeData)
-          case Failure(err) => err match {
-            case _: MongoTimeoutException =>
-              metricsService.recordMetric("mongo_cache_failure")
-              logger.error(s"Database connection failed, ${err.getMessage}")
-              Future.successful(Left(DatabaseServiceDown))
-            case _ =>
-              metricsService.recordMetric("mongo_cache_failure")
-              logger.error(s"Database operation failed, ${err.getMessage}")
-              Future.successful(Left(DatabaseServiceError))
-          }
-        }
-      case Success(value) if value.nonEmpty =>
-        Future.successful(Left(RequestInProgress))
+      case Failure(err) => Future.successful(onDatabaseError(err))
+      case Success(v) if v.isEmpty => persistAndSendPasscode(dataToSave)
+      case Success(v) if (v.nonEmpty && (calculateElapsedTime(v.get.createdAt, now) > passcodeExpiry * MILLIS_IN_MIN)) =>
+        persistAndSendPasscode(dataToSave)
+      case Success(v) if (v.nonEmpty) => Future.successful(Left(RequestInProgress))
     }
   }
 
@@ -117,16 +96,7 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
       maybeEmailAndPasscodeData <- passcodeService.retrievePasscode(validatedEmail.email)
       result <- processPasscode(EmailAndPasscode(validatedEmail.email, passcode), maybeEmailAndPasscodeData)
     } yield result).recover {
-      case err => err match {
-        case _: MongoTimeoutException =>
-          metricsService.recordMetric("mongo_cache_failure")
-          logger.error(s"Database connection failed - ${err.getMessage}")
-          Left(DatabaseServiceDown)
-        case _ =>
-          metricsService.recordMetric("mongo_cache_failure")
-          logger.error(s"Database operation failed, ${err.getMessage}")
-          Left(DatabaseServiceError)
-      }
+      case err => onDatabaseError(err)
     }
   }
 
@@ -157,8 +127,8 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
     }
   }
 
-  private def hasPasscodeExpired(foundPhoneNumberPasscodeData: EmailAndPasscodeData, currentTime: Long) = {
-    val elapsedTimeInMilliseconds: Long = calculateElapsedTime(foundPhoneNumberPasscodeData.createdAt, currentTime)
+  private def hasPasscodeExpired(foundEmailPasscodeData: EmailAndPasscodeData, currentTime: Long) = {
+    val elapsedTimeInMilliseconds: Long = calculateElapsedTime(foundEmailPasscodeData.createdAt, currentTime)
     val allowedTimeGapForPasscodeUsageInMilliseconds: Long = Duration.ofMinutes(passcodeExpiry).toMillis
     elapsedTimeInMilliseconds > allowedTimeGapForPasscodeUsageInMilliseconds
   }
@@ -220,7 +190,9 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
 
     govUkConnector.sendPasscode(data) transformWith {
       case Success(response) => response match {
-        case _ if is2xx(response.status) => Future.successful(success(response))
+        case _ if is2xx(response.status) =>
+          metricsService.recordMetric("gov-notify_call_success")
+          Future.successful(success(response))
         case _ => Future.successful(failure(response))
       }
       case Failure(response) =>
@@ -228,6 +200,26 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
         metricsService.recordMetric("gov-notify_connection_failure")
         logger.error(response.getMessage)
         Future.successful(Left(GovNotifyServiceDown))
+    }
+  }
+
+  private def persistAndSendPasscode(dataToSave: EmailAndPasscodeData)(implicit hc: HeaderCarrier) = {
+    passcodeService.persistPasscode(dataToSave) transformWith {
+      case Success(savedEmailPasscodeData) => sendPasscode(savedEmailPasscodeData)
+      case Failure(err) => Future.successful(onDatabaseError(err))
+    }
+  }
+
+  private def onDatabaseError(err: Throwable) = {
+    err match {
+      case _: MongoTimeoutException =>
+        metricsService.recordMetric("mongo_cache_failure")
+        logger.error(s"Database connection failed - ${err.getMessage}")
+        Left(DatabaseServiceDown)
+      case _ =>
+        metricsService.recordMetric("mongo_cache_failure")
+        logger.error(s"Database operation failed, ${err.getMessage}")
+        Left(DatabaseServiceError)
     }
   }
 }

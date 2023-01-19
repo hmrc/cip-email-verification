@@ -26,7 +26,7 @@ import play.api.mvc.AnyContentAsEmpty
 import play.api.test.Helpers.{LOCATION, contentAsJson, contentAsString, defaultAwaitTimeout, header, status}
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.cipemailverification.models.api.Email
-import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes.{Code, EXTERNAL_SERVER_ERROR, EXTERNAL_SERVER_FAIL_FORBIDDEN, EXTERNAL_SERVER_FAIL_VALIDATION, EXTERNAL_SERVER_UNREACHABLE, MESSAGE_THROTTLED_OUT, PASSCODE_PERSISTING_FAIL, SERVER_ERROR, SERVER_UNREACHABLE, VALIDATION_ERROR}
+import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes._
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages.{ENTER_A_VALID_EMAIL, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE, EXTERNAL_SERVER_EXPERIENCED_AN_ISSUE, Message, PASSCODE_PERSIST_ERROR, SERVER_CURRENTLY_UNAVAILABLE, SERVER_EXPERIENCED_AN_ISSUE, THROTTLED_TOO_MANY_REQUESTS}
 import uk.gov.hmrc.cipemailverification.models.domain.result._
 import uk.gov.hmrc.cipemailverification.models.http.govnotify.GovUkNotificationId
