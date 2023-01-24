@@ -116,28 +116,28 @@ class VerifyControllerSpec
       mockVerifyService.verifyEmail(email)(any[HeaderCarrier]) was called
     }
 
-    "return ServiceUnavailable when verify service returns ValidationServiceDown" in new SetUp {
+    "return GatewayTimeout when verify service returns ValidationServiceDown" in new SetUp {
       private val email = Email("test@test.test")
       mockVerifyService.verifyEmail(email)(any[HeaderCarrier])
         .returns(Future.successful(Left(ValidationServiceDown)))
       private val result = controller.verify(
         fakeRequest.withBody(Json.toJson(email))
       )
-      status(result) shouldBe SERVICE_UNAVAILABLE
+      status(result) shouldBe GATEWAY_TIMEOUT
       (contentAsJson(result) \ "code").as[Code] shouldBe SERVER_UNREACHABLE
       (contentAsJson(result) \ "message").as[Message] shouldBe SERVER_CURRENTLY_UNAVAILABLE
 
       mockVerifyService.verifyEmail(email)(any[HeaderCarrier]) was called
     }
 
-    "return ServiceUnavailable when verify service returns GovNotifyServiceDown" in new SetUp {
+    "return GatewayTimeout when verify service returns GovNotifyServiceDown" in new SetUp {
       private val email = Email("test@test.test")
       mockVerifyService.verifyEmail(email)(any[HeaderCarrier])
         .returns(Future.successful(Left(GovNotifyServiceDown)))
       private val result = controller.verify(
         fakeRequest.withBody(Json.toJson(email))
       )
-      status(result) shouldBe SERVICE_UNAVAILABLE
+      status(result) shouldBe GATEWAY_TIMEOUT
       (contentAsJson(result) \ "code").as[Code] shouldBe EXTERNAL_SERVER_UNREACHABLE
       (contentAsJson(result) \ "message").as[Message] shouldBe EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE
 
@@ -158,28 +158,28 @@ class VerifyControllerSpec
       mockVerifyService.verifyEmail(email)(any[HeaderCarrier]) was called
     }
 
-    "return ServiceUnavailable when verify service returns GovNotifyBadRequest" in new SetUp {
+    "return InternalServerError when verify service returns GovNotifyBadRequest" in new SetUp {
       private val email = Email("test@test.test")
       mockVerifyService.verifyEmail(email)(any[HeaderCarrier])
         .returns(Future.successful(Left(GovNotifyBadRequest)))
       private val result = controller.verify(
         fakeRequest.withBody(Json.toJson(email))
       )
-      status(result) shouldBe SERVICE_UNAVAILABLE
+      status(result) shouldBe INTERNAL_SERVER_ERROR
       (contentAsJson(result) \ "code").as[Code] shouldBe EXTERNAL_SERVER_FAIL_VALIDATION
       (contentAsJson(result) \ "message").as[Message] shouldBe SERVER_EXPERIENCED_AN_ISSUE
 
       mockVerifyService.verifyEmail(email)(any[HeaderCarrier]) was called
     }
 
-    "return ServiceUnavailable when verify service returns GovNotifyForbidden" in new SetUp {
+    "return InternalServerError when verify service returns GovNotifyForbidden" in new SetUp {
       private val email = Email("test@test.test")
       mockVerifyService.verifyEmail(email)(any[HeaderCarrier])
         .returns(Future.successful(Left(GovNotifyForbidden)))
       private val result = controller.verify(
         fakeRequest.withBody(Json.toJson(email))
       )
-      status(result) shouldBe SERVICE_UNAVAILABLE
+      status(result) shouldBe INTERNAL_SERVER_ERROR
       (contentAsJson(result) \ "code").as[Code] shouldBe EXTERNAL_SERVER_FAIL_FORBIDDEN
       (contentAsJson(result) \ "message").as[Message] shouldBe SERVER_EXPERIENCED_AN_ISSUE
 

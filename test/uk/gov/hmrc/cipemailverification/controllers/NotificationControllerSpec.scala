@@ -174,13 +174,13 @@ class NotificationControllerSpec extends AnyWordSpec
       mockNotificationsService.status(notificationId)(any[HeaderCarrier]) was called
     }
 
-    "return ServiceUnavailable with ErrorResponse when notification service returns GovNotifyForbidden" in new SetUp {
+    "return InternalServerError with ErrorResponse when notification service returns GovNotifyForbidden" in new SetUp {
       val notificationId = "notificationId"
       mockNotificationsService.status(notificationId)(any[HeaderCarrier])
         .returns(Future.successful(Left(GovNotifyForbidden)))
 
       private val result = controller.status(notificationId)(fakeRequest)
-      status(result) shouldBe SERVICE_UNAVAILABLE
+      status(result) shouldBe INTERNAL_SERVER_ERROR
       (contentAsJson(result) \ "code").as[Code] shouldBe EXTERNAL_SERVER_FAIL_FORBIDDEN
       (contentAsJson(result) \ "message").as[Message] shouldBe SERVER_EXPERIENCED_AN_ISSUE
 

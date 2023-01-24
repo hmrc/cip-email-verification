@@ -18,7 +18,6 @@ package uk.gov.hmrc.cipemailverification.controllers
 
 import play.api.libs.json.{JsSuccess, JsValue, Json, Reads}
 import play.api.mvc.{Action, ControllerComponents, Request, Result}
-import uk.gov.hmrc.cipemailverification.controllers.InternalAuthAccess.permission
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Codes._
 import uk.gov.hmrc.cipemailverification.models.api.ErrorResponse.Messages._
 import uk.gov.hmrc.cipemailverification.models.api.{Email, ErrorResponse}
@@ -33,26 +32,26 @@ import scala.concurrent.Future
 
 @Singleton()
 class VerifyController @Inject()(cc: ControllerComponents, service: VerifyService, auth: BackendAuthComponents)
-  extends BackendController(cc) {
+  extends BackendController(cc) with InternalAuthAccess {
 
   def verify: Action[JsValue] = auth.authorizedAction[Unit](permission).compose(Action(parse.json)).async { implicit request =>
     def onError(error: ApplicationError) = error match {
       case ValidationError => BadRequest(Json.toJson(ErrorResponse(VALIDATION_ERROR, ENTER_A_VALID_EMAIL)))
       case ValidationServiceError => BadGateway(Json.toJson(
         ErrorResponse(SERVER_ERROR, SERVER_EXPERIENCED_AN_ISSUE)))
-      case ValidationServiceDown => ServiceUnavailable(Json.toJson(
+      case ValidationServiceDown => GatewayTimeout(Json.toJson(
         ErrorResponse(SERVER_UNREACHABLE, SERVER_CURRENTLY_UNAVAILABLE)))
       case DatabaseServiceDown => GatewayTimeout(Json.toJson(
         ErrorResponse(EXTERNAL_SERVER_UNREACHABLE, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
       case DatabaseServiceError => InternalServerError(Json.toJson(
         ErrorResponse(PASSCODE_PERSISTING_FAIL, PASSCODE_PERSIST_ERROR)))
-      case GovNotifyServiceDown => ServiceUnavailable(Json.toJson(
+      case GovNotifyServiceDown => GatewayTimeout(Json.toJson(
         ErrorResponse(EXTERNAL_SERVER_UNREACHABLE, EXTERNAL_SERVER_CURRENTLY_UNAVAILABLE)))
       case GovNotifyServerError => BadGateway(Json.toJson(
         ErrorResponse(EXTERNAL_SERVER_ERROR, EXTERNAL_SERVER_EXPERIENCED_AN_ISSUE)))
-      case GovNotifyBadRequest => ServiceUnavailable(Json.toJson(
+      case GovNotifyBadRequest => InternalServerError(Json.toJson(
         ErrorResponse(EXTERNAL_SERVER_FAIL_VALIDATION, SERVER_EXPERIENCED_AN_ISSUE)))
-      case GovNotifyForbidden => ServiceUnavailable(Json.toJson(
+      case GovNotifyForbidden => InternalServerError(Json.toJson(
         ErrorResponse(EXTERNAL_SERVER_FAIL_FORBIDDEN, SERVER_EXPERIENCED_AN_ISSUE)))
       case GovNotifyTooManyRequests => TooManyRequests(Json.toJson(
         ErrorResponse(MESSAGE_THROTTLED_OUT, THROTTLED_TOO_MANY_REQUESTS)))

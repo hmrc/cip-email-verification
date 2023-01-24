@@ -18,7 +18,7 @@ package uk.gov.hmrc.cipemailverification.controllers
 
 import uk.gov.hmrc.internalauth.client.{IAAction, Predicate, Resource, ResourceLocation, ResourceType}
 
-object InternalAuthAccess {
+trait InternalAuthAccess {
   val permission: Predicate.Permission = Predicate.Permission(Resource(
     ResourceType("cip-email-verification"),
     ResourceLocation("*")),
