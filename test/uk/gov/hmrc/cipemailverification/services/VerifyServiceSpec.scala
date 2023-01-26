@@ -79,6 +79,7 @@ class VerifyServiceSpec extends AnyWordSpec
       passcodeServiceMock.persistPasscode(emailPasscodeDataFromDb) was called
       // Check what is sent to GovNotify
       govUkConnectorMock.sendPasscode(emailPasscodeDataFromDb)(any[HeaderCarrier]) was called
+      mockMetricsService.recordMetric(any[String]) was called
     }
 
     "return ValidationError if email is invalid" in new SetUp {
@@ -125,6 +126,7 @@ class VerifyServiceSpec extends AnyWordSpec
         expectedAuditEvent) was called
       // check what is sent to the cache
       passcodeServiceMock.retrievePasscode(emailPasscodeDataFromDb.email) was called
+      mockMetricsService.recordMetric(any[String]) was called
     }
 
     "return too many requests if email address is valid and the email database entry(same) already exists" in new SetUp {
@@ -473,6 +475,7 @@ class VerifyServiceSpec extends AnyWordSpec
       // check what is sent to the audit service
       private val expectedAuditEvent = VerificationCheckAuditEvent("enteredEmail", "enteredPasscode", "Verified")
       auditServiceMock.sendExplicitAuditEvent(EmailVerificationCheck, expectedAuditEvent) was called
+      mockMetricsService.recordMetric(any[String]) was called
     }
 
     "return NotFound if cache has expired or if passcode does not exist" in new SetUp {
