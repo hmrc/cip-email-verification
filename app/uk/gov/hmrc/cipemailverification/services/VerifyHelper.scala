@@ -117,7 +117,6 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
                                                     foundEmailPasscodeData: EmailAndPasscodeData, now: Long)
                                                    (implicit hc: HeaderCarrier) = {
     if (hasPasscodeExpired(foundEmailPasscodeData: EmailAndPasscodeData, now)) {
-      metricsService.recordMetric("passcode_verification_success")
       auditService.sendExplicitAuditEvent(EmailVerificationCheck,
         VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, NOT_VERIFIED,
           Some("Passcode expired")))
@@ -137,11 +136,11 @@ abstract class VerifyHelper @Inject()(passcodeGenerator: PasscodeGenerator,
                                      maybeEmailAndPasscodeData: EmailAndPasscodeData)
                                     (implicit hc: HeaderCarrier) = {
     if (passcodeMatches(enteredEmailAndPasscode.passcode, maybeEmailAndPasscodeData.passcode)) {
+      metricsService.recordMetric("passcode_verification_success")
       auditService.sendExplicitAuditEvent(EmailVerificationCheck,
         VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, VERIFIED))
       Future.successful(Right(Verified))
     } else {
-
       auditService.sendExplicitAuditEvent(EmailVerificationCheck,
         VerificationCheckAuditEvent(enteredEmailAndPasscode.email, enteredEmailAndPasscode.passcode, NOT_VERIFIED,
           Some("Passcode mismatch")))
